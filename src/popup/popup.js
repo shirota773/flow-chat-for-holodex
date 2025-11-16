@@ -2,13 +2,16 @@
 
 const defaultSettings = {
   enabled: true,
-  speed: 160,
+  displayTime: 8,
   fontSize: 28,
   opacity: 1.0,
   maxMessages: 50,
-  showAuthor: false,
   displayArea: 1.0,
   minVerticalGap: 4,
+  showOwner: true,
+  showModerator: true,
+  showMember: true,
+  showNormal: true,
   avatarOwner: true,
   avatarModerator: false,
   avatarMember: false,
@@ -23,15 +26,18 @@ const elements = {
   statusText: document.getElementById('status-text'),
   message: document.getElementById('message'),
   enabled: document.getElementById('enabled'),
-  speed: document.getElementById('speed'),
-  speedValue: document.getElementById('speed-value'),
+  displayTime: document.getElementById('displayTime'),
+  displayTimeValue: document.getElementById('displayTime-value'),
   fontSize: document.getElementById('fontSize'),
   fontSizeValue: document.getElementById('fontSize-value'),
   opacity: document.getElementById('opacity'),
   opacityValue: document.getElementById('opacity-value'),
   displayArea: document.getElementById('displayArea'),
   displayAreaValue: document.getElementById('displayArea-value'),
-  showAuthor: document.getElementById('showAuthor'),
+  showOwner: document.getElementById('showOwner'),
+  showModerator: document.getElementById('showModerator'),
+  showMember: document.getElementById('showMember'),
+  showNormal: document.getElementById('showNormal'),
   avatarOwner: document.getElementById('avatarOwner'),
   avatarModerator: document.getElementById('avatarModerator'),
   avatarMember: document.getElementById('avatarMember'),
@@ -53,15 +59,18 @@ function loadSettings() {
 // Update UI with current settings
 function updateUI() {
   elements.enabled.checked = currentSettings.enabled;
-  elements.speed.value = currentSettings.speed;
-  elements.speedValue.textContent = `${currentSettings.speed}px/s`;
+  elements.displayTime.value = currentSettings.displayTime;
+  elements.displayTimeValue.textContent = `${currentSettings.displayTime}s`;
   elements.fontSize.value = currentSettings.fontSize;
   elements.fontSizeValue.textContent = `${currentSettings.fontSize}px`;
   elements.opacity.value = currentSettings.opacity;
   elements.opacityValue.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
   elements.displayArea.value = currentSettings.displayArea;
   elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
-  elements.showAuthor.checked = currentSettings.showAuthor;
+  elements.showOwner.checked = currentSettings.showOwner;
+  elements.showModerator.checked = currentSettings.showModerator;
+  elements.showMember.checked = currentSettings.showMember;
+  elements.showNormal.checked = currentSettings.showNormal;
   elements.avatarOwner.checked = currentSettings.avatarOwner;
   elements.avatarModerator.checked = currentSettings.avatarModerator;
   elements.avatarMember.checked = currentSettings.avatarMember;
@@ -72,13 +81,16 @@ function updateUI() {
 function saveSettings() {
   currentSettings = {
     enabled: elements.enabled.checked,
-    speed: parseInt(elements.speed.value),
+    displayTime: parseInt(elements.displayTime.value),
     fontSize: parseInt(elements.fontSize.value),
     opacity: parseFloat(elements.opacity.value),
     maxMessages: currentSettings.maxMessages,
-    showAuthor: elements.showAuthor.checked,
     displayArea: parseFloat(elements.displayArea.value),
     minVerticalGap: currentSettings.minVerticalGap,
+    showOwner: elements.showOwner.checked,
+    showModerator: elements.showModerator.checked,
+    showMember: elements.showMember.checked,
+    showNormal: elements.showNormal.checked,
     avatarOwner: elements.avatarOwner.checked,
     avatarModerator: elements.avatarModerator.checked,
     avatarMember: elements.avatarMember.checked,
@@ -139,8 +151,8 @@ function checkCurrentTab() {
 }
 
 // Event listeners
-elements.speed.addEventListener('input', (e) => {
-  elements.speedValue.textContent = `${e.target.value}px/s`;
+elements.displayTime.addEventListener('input', (e) => {
+  elements.displayTimeValue.textContent = `${e.target.value}s`;
 });
 
 elements.fontSize.addEventListener('input', (e) => {

@@ -165,10 +165,10 @@
     </label>
 
     <label>
-      <span>Speed</span>
+      <span>Display Time</span>
       <div>
-        <input type="range" id="speed" min="80" max="400" step="20" value="160">
-        <span class="value-display" id="speed-value">160px/s</span>
+        <input type="range" id="displayTime" min="4" max="15" step="1" value="8">
+        <span class="value-display" id="displayTime-value">8s</span>
       </div>
     </label>
 
@@ -196,12 +196,29 @@
       </div>
     </label>
 
+    <div style="margin: 12px 0 8px 0; font-size: 13px; opacity: 0.8; font-weight: 600;">Show Comments:</div>
+
     <label>
-      <span>Show Author Name</span>
-      <input type="checkbox" id="showAuthor">
+      <span>Owner</span>
+      <input type="checkbox" id="showOwner" checked>
     </label>
 
-    <div style="margin: 12px 0 8px 0; font-size: 13px; opacity: 0.8; font-weight: 600;">Avatar Display:</div>
+    <label>
+      <span>Moderator</span>
+      <input type="checkbox" id="showModerator" checked>
+    </label>
+
+    <label>
+      <span>Member</span>
+      <input type="checkbox" id="showMember" checked>
+    </label>
+
+    <label>
+      <span>Normal</span>
+      <input type="checkbox" id="showNormal" checked>
+    </label>
+
+    <div style="margin: 12px 0 8px 0; font-size: 13px; opacity: 0.8; font-weight: 600;">Show Avatar:</div>
 
     <label>
       <span>Owner</span>

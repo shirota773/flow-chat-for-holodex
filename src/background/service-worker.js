@@ -10,13 +10,16 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.sync.set({
       flowChatSettings: {
         enabled: true,
-        speed: 160,
+        displayTime: 8,
         fontSize: 28,
         opacity: 1.0,
         maxMessages: 50,
-        showAuthor: false,
         displayArea: 1.0,
         minVerticalGap: 4,
+        showOwner: true,
+        showModerator: true,
+        showMember: true,
+        showNormal: true,
         avatarOwner: true,
         avatarModerator: false,
         avatarMember: false,

@@ -7,13 +7,17 @@
   // Default settings
   const defaultSettings = {
     enabled: true,
-    speed: 160,      // pixels per second (fixed speed)
+    displayTime: 8,  // seconds to display on screen
     fontSize: 28,    // pixels
     opacity: 1.0,
     maxMessages: 50, // max simultaneous messages
-    showAuthor: false, // hide username by default
     displayArea: 1.0, // percentage of screen height to use (0.0-1.0)
     minVerticalGap: 4, // minimum pixels between messages vertically
+    // Show/hide comments per user type
+    showOwner: true,
+    showModerator: true,
+    showMember: true,
+    showNormal: true,
     // Avatar settings per user type
     avatarOwner: true,
     avatarModerator: false,
@@ -95,29 +99,39 @@
       return false; // No vertical overlap
     }
 
-    // Horizontal collision check (do they overlap in time and space?)
-    // Calculate positions at current time
+    // Horizontal collision check
+    // Each message has its own speed based on its width and displayTime
     const now = Date.now();
 
-    // Message position: starts at containerWidth, moves left at speed px/s
-    // position = containerWidth - speed * (now - startTime) / 1000
-    const msg1Left = containerWidth - settings.speed * (now - msg1.startTime) / 1000;
+    // Calculate speed for each message (pixels per second)
+    const msg1Speed = (containerWidth + msg1.width) / settings.displayTime;
+    const msg2Speed = (containerWidth + msg2.width) / settings.displayTime;
+
+    // Calculate current positions
+    const msg1Left = containerWidth - msg1Speed * (now - msg1.startTime) / 1000;
     const msg1Right = msg1Left + msg1.width;
 
-    const msg2Left = containerWidth - settings.speed * (now - msg2.startTime) / 1000;
+    const msg2Left = containerWidth - msg2Speed * (now - msg2.startTime) / 1000;
     const msg2Right = msg2Left + msg2.width;
 
-    // Check if msg1's right edge has passed msg2's left edge
-    // New message (msg2) should not overlap with existing message (msg1)
-    // Check: will the new message catch up or collide with existing one?
-
-    // If msg1 is ahead (started earlier), check if msg2 would hit it
-    // Since both move at same speed, if msg1Right > msg2Left now, they collide
-    // Also need to ensure new message tail doesn't get hit by existing message head
-
-    // Simple overlap check: if horizontal ranges overlap now, they'll stay overlapped
+    // If they overlap now, they collide
     if (msg1Right > msg2Left && msg1Left < msg2Right) {
-      return true; // Collision
+      return true;
+    }
+
+    // Check if they will collide in the future (faster message catches up)
+    // If msg2 is faster and behind msg1, check if it will catch up
+    if (msg2Speed > msg1Speed && msg2Left > msg1Left) {
+      // Time for msg2's head to reach msg1's tail
+      const relativeSpeed = msg2Speed - msg1Speed;
+      const distance = msg2Left - msg1Right;
+      const timeToCollide = (distance / relativeSpeed) * 1000; // ms
+
+      // Check if collision happens before msg1 exits screen
+      const msg1ExitTime = (msg1Right / msg1Speed) * 1000;
+      if (timeToCollide < msg1ExitTime) {
+        return true;
+      }
     }
 
     return false;
@@ -163,6 +177,24 @@
     const container = flowContainers.get(chatData.videoId);
     if (!container || !settings.enabled) return;
 
+    // Check if this user type should be shown
+    let shouldShow = true;
+    switch (chatData.type) {
+      case 'owner':
+        shouldShow = settings.showOwner;
+        break;
+      case 'moderator':
+        shouldShow = settings.showModerator;
+        break;
+      case 'member':
+        shouldShow = settings.showMember;
+        break;
+      default:
+        shouldShow = settings.showNormal;
+    }
+
+    if (!shouldShow) return;
+
     // Limit simultaneous messages
     if (container.children.length >= settings.maxMessages) {
       // Skip this message if at capacity
@@ -198,14 +230,6 @@
       avatar.src = chatData.avatar;
       avatar.alt = '';
       messageEl.appendChild(avatar);
-    }
-
-    // Add author if enabled
-    if (settings.showAuthor && chatData.author) {
-      const author = document.createElement('span');
-      author.className = 'flow-chat-author';
-      author.textContent = chatData.author + ':';
-      messageEl.appendChild(author);
     }
 
     // Add message content (text and emoji/sticker images)
@@ -263,9 +287,9 @@
       return;
     }
 
-    // Calculate animation duration based on fixed speed (pixels per second)
+    // Animation duration is fixed to displayTime (seconds)
     const totalDistance = containerWidth + messageWidth;
-    const animationDuration = totalDistance / settings.speed; // seconds
+    const animationDuration = settings.displayTime; // seconds
 
     // Track this message for collision detection
     const messageInfo = {
@@ -383,8 +407,8 @@
       </label>
 
       <label>
-        <span>Speed (${settings.speed}px/s)</span>
-        <input type="range" id="flow-speed" min="80" max="400" step="20" value="${settings.speed}">
+        <span>Display Time (${settings.displayTime}s)</span>
+        <input type="range" id="flow-display-time" min="4" max="15" step="1" value="${settings.displayTime}">
       </label>
 
       <label>
@@ -402,12 +426,29 @@
         <input type="range" id="flow-display-area" min="0.3" max="1" step="0.1" value="${settings.displayArea}">
       </label>
 
+      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Show Comments:</div>
+
       <label>
-        <span>Show Author Name</span>
-        <input type="checkbox" id="flow-show-author" ${settings.showAuthor ? 'checked' : ''}>
+        <span>Owner</span>
+        <input type="checkbox" id="flow-show-owner" ${settings.showOwner ? 'checked' : ''}>
       </label>
 
-      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Avatar Display:</div>
+      <label>
+        <span>Moderator</span>
+        <input type="checkbox" id="flow-show-moderator" ${settings.showModerator ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Member</span>
+        <input type="checkbox" id="flow-show-member" ${settings.showMember ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Normal</span>
+        <input type="checkbox" id="flow-show-normal" ${settings.showNormal ? 'checked' : ''}>
+      </label>
+
+      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Show Avatar:</div>
 
       <label>
         <span>Owner</span>
@@ -441,9 +482,9 @@
       saveSettings();
     });
 
-    panel.querySelector('#flow-speed').addEventListener('input', (e) => {
-      settings.speed = parseInt(e.target.value);
-      e.target.previousElementSibling.textContent = `Speed (${settings.speed}px/s)`;
+    panel.querySelector('#flow-display-time').addEventListener('input', (e) => {
+      settings.displayTime = parseInt(e.target.value);
+      e.target.previousElementSibling.textContent = `Display Time (${settings.displayTime}s)`;
     });
 
     panel.querySelector('#flow-font-size').addEventListener('input', (e) => {
@@ -460,8 +501,20 @@
       e.target.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
     });
 
-    panel.querySelector('#flow-show-author').addEventListener('change', (e) => {
-      settings.showAuthor = e.target.checked;
+    panel.querySelector('#flow-show-owner').addEventListener('change', (e) => {
+      settings.showOwner = e.target.checked;
+    });
+
+    panel.querySelector('#flow-show-moderator').addEventListener('change', (e) => {
+      settings.showModerator = e.target.checked;
+    });
+
+    panel.querySelector('#flow-show-member').addEventListener('change', (e) => {
+      settings.showMember = e.target.checked;
+    });
+
+    panel.querySelector('#flow-show-normal').addEventListener('change', (e) => {
+      settings.showNormal = e.target.checked;
     });
 
     panel.querySelector('#flow-avatar-owner').addEventListener('change', (e) => {
@@ -499,20 +552,23 @@
     if (!panel) return;
 
     const enabledEl = panel.querySelector('#flow-enabled');
-    const speedEl = panel.querySelector('#flow-speed');
+    const displayTimeEl = panel.querySelector('#flow-display-time');
     const fontSizeEl = panel.querySelector('#flow-font-size');
     const opacityEl = panel.querySelector('#flow-opacity');
     const displayAreaEl = panel.querySelector('#flow-display-area');
-    const showAuthorEl = panel.querySelector('#flow-show-author');
+    const showOwnerEl = panel.querySelector('#flow-show-owner');
+    const showModeratorEl = panel.querySelector('#flow-show-moderator');
+    const showMemberEl = panel.querySelector('#flow-show-member');
+    const showNormalEl = panel.querySelector('#flow-show-normal');
     const avatarOwnerEl = panel.querySelector('#flow-avatar-owner');
     const avatarModeratorEl = panel.querySelector('#flow-avatar-moderator');
     const avatarMemberEl = panel.querySelector('#flow-avatar-member');
     const avatarNormalEl = panel.querySelector('#flow-avatar-normal');
 
     if (enabledEl) enabledEl.checked = settings.enabled;
-    if (speedEl) {
-      speedEl.value = settings.speed;
-      speedEl.previousElementSibling.textContent = `Speed (${settings.speed}px/s)`;
+    if (displayTimeEl) {
+      displayTimeEl.value = settings.displayTime;
+      displayTimeEl.previousElementSibling.textContent = `Display Time (${settings.displayTime}s)`;
     }
     if (fontSizeEl) {
       fontSizeEl.value = settings.fontSize;
@@ -523,7 +579,10 @@
       displayAreaEl.value = settings.displayArea;
       displayAreaEl.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
     }
-    if (showAuthorEl) showAuthorEl.checked = settings.showAuthor;
+    if (showOwnerEl) showOwnerEl.checked = settings.showOwner;
+    if (showModeratorEl) showModeratorEl.checked = settings.showModerator;
+    if (showMemberEl) showMemberEl.checked = settings.showMember;
+    if (showNormalEl) showNormalEl.checked = settings.showNormal;
     if (avatarOwnerEl) avatarOwnerEl.checked = settings.avatarOwner;
     if (avatarModeratorEl) avatarModeratorEl.checked = settings.avatarModerator;
     if (avatarMemberEl) avatarMemberEl.checked = settings.avatarMember;
