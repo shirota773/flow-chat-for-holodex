@@ -22,7 +22,12 @@
     avatarOwner: true,
     avatarModerator: false,
     avatarMember: false,
-    avatarNormal: false
+    avatarNormal: false,
+    // Color settings per user type (RGB)
+    colorOwner: { r: 255, g: 215, b: 0 },      // Gold
+    colorModerator: { r: 94, g: 132, b: 241 },  // Blue
+    colorMember: { r: 46, g: 204, b: 113 },     // Green
+    colorNormal: { r: 255, g: 255, b: 255 }     // White
   };
 
   let settings = { ...defaultSettings };
@@ -205,6 +210,23 @@
     messageEl.className = `flow-chat-message ${chatData.type}`;
     messageEl.style.fontSize = `${settings.fontSize}px`;
     messageEl.style.opacity = settings.opacity;
+
+    // Get color for this user type
+    let messageColor = settings.colorNormal;
+    switch (chatData.type) {
+      case 'owner':
+        messageColor = settings.colorOwner;
+        break;
+      case 'moderator':
+        messageColor = settings.colorModerator;
+        break;
+      case 'member':
+        messageColor = settings.colorMember;
+        break;
+      default:
+        messageColor = settings.colorNormal;
+    }
+    messageEl.style.color = `rgb(${messageColor.r}, ${messageColor.g}, ${messageColor.b})`;
 
     // Add avatar based on user type settings
     let showAvatar = false;

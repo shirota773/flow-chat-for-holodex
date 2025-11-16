@@ -23,7 +23,11 @@ chrome.runtime.onInstalled.addListener((details) => {
         avatarOwner: true,
         avatarModerator: false,
         avatarMember: false,
-        avatarNormal: false
+        avatarNormal: false,
+        colorOwner: { r: 255, g: 215, b: 0 },
+        colorModerator: { r: 94, g: 132, b: 241 },
+        colorMember: { r: 46, g: 204, b: 113 },
+        colorNormal: { r: 255, g: 255, b: 255 }
       }
     });
   }

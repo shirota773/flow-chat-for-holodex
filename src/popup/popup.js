@@ -15,10 +15,15 @@ const defaultSettings = {
   avatarOwner: true,
   avatarModerator: false,
   avatarMember: false,
-  avatarNormal: false
+  avatarNormal: false,
+  colorOwner: { r: 255, g: 215, b: 0 },      // Gold
+  colorModerator: { r: 94, g: 132, b: 241 },  // Blue
+  colorMember: { r: 46, g: 204, b: 113 },     // Green
+  colorNormal: { r: 255, g: 255, b: 255 }     // White
 };
 
 let currentSettings = { ...defaultSettings };
+let currentColorType = null;
 
 // DOM elements
 const elements = {
@@ -42,9 +47,31 @@ const elements = {
   avatarModerator: document.getElementById('avatarModerator'),
   avatarMember: document.getElementById('avatarMember'),
   avatarNormal: document.getElementById('avatarNormal'),
+  colorOwner: document.getElementById('colorOwner'),
+  colorModerator: document.getElementById('colorModerator'),
+  colorMember: document.getElementById('colorMember'),
+  colorNormal: document.getElementById('colorNormal'),
   save: document.getElementById('save'),
-  reset: document.getElementById('reset')
+  reset: document.getElementById('reset'),
+  // Color modal elements
+  colorModal: document.getElementById('colorModal'),
+  colorModalTitle: document.getElementById('colorModalTitle'),
+  colorModalClose: document.getElementById('colorModalClose'),
+  colorPreview: document.getElementById('colorPreview'),
+  redSlider: document.getElementById('redSlider'),
+  greenSlider: document.getElementById('greenSlider'),
+  blueSlider: document.getElementById('blueSlider'),
+  redValue: document.getElementById('redValue'),
+  greenValue: document.getElementById('greenValue'),
+  blueValue: document.getElementById('blueValue'),
+  colorApply: document.getElementById('colorApply'),
+  colorCancel: document.getElementById('colorCancel')
 };
+
+// Helper to convert RGB object to CSS color string
+function rgbToString(rgb) {
+  return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+}
 
 // Load settings from storage
 function loadSettings() {
@@ -75,6 +102,12 @@ function updateUI() {
   elements.avatarModerator.checked = currentSettings.avatarModerator;
   elements.avatarMember.checked = currentSettings.avatarMember;
   elements.avatarNormal.checked = currentSettings.avatarNormal;
+
+  // Update color swatches
+  elements.colorOwner.style.backgroundColor = rgbToString(currentSettings.colorOwner);
+  elements.colorModerator.style.backgroundColor = rgbToString(currentSettings.colorModerator);
+  elements.colorMember.style.backgroundColor = rgbToString(currentSettings.colorMember);
+  elements.colorNormal.style.backgroundColor = rgbToString(currentSettings.colorNormal);
 }
 
 // Save settings to storage
@@ -94,7 +127,11 @@ function saveSettings() {
     avatarOwner: elements.avatarOwner.checked,
     avatarModerator: elements.avatarModerator.checked,
     avatarMember: elements.avatarMember.checked,
-    avatarNormal: elements.avatarNormal.checked
+    avatarNormal: elements.avatarNormal.checked,
+    colorOwner: currentSettings.colorOwner,
+    colorModerator: currentSettings.colorModerator,
+    colorMember: currentSettings.colorMember,
+    colorNormal: currentSettings.colorNormal
   };
 
   chrome.storage.sync.set({ flowChatSettings: currentSettings }, () => {
@@ -150,6 +187,55 @@ function checkCurrentTab() {
   });
 }
 
+// Color picker modal functions
+function openColorPicker(type) {
+  currentColorType = type;
+  const colorKey = `color${type.charAt(0).toUpperCase() + type.slice(1)}`;
+  const color = currentSettings[colorKey];
+
+  elements.colorModalTitle.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)} Color`;
+  elements.redSlider.value = color.r;
+  elements.greenSlider.value = color.g;
+  elements.blueSlider.value = color.b;
+  updateColorPreview();
+
+  elements.colorModal.classList.add('active');
+}
+
+function closeColorPicker() {
+  elements.colorModal.classList.remove('active');
+  currentColorType = null;
+}
+
+function updateColorPreview() {
+  const r = parseInt(elements.redSlider.value);
+  const g = parseInt(elements.greenSlider.value);
+  const b = parseInt(elements.blueSlider.value);
+
+  elements.redValue.textContent = r;
+  elements.greenValue.textContent = g;
+  elements.blueValue.textContent = b;
+
+  elements.colorPreview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+}
+
+function applyColor() {
+  if (!currentColorType) return;
+
+  const colorKey = `color${currentColorType.charAt(0).toUpperCase() + currentColorType.slice(1)}`;
+  currentSettings[colorKey] = {
+    r: parseInt(elements.redSlider.value),
+    g: parseInt(elements.greenSlider.value),
+    b: parseInt(elements.blueSlider.value)
+  };
+
+  // Update swatch
+  const swatchId = `color${currentColorType.charAt(0).toUpperCase() + currentColorType.slice(1)}`;
+  elements[swatchId].style.backgroundColor = rgbToString(currentSettings[colorKey]);
+
+  closeColorPicker();
+}
+
 // Event listeners
 elements.displayTime.addEventListener('input', (e) => {
   elements.displayTimeValue.textContent = `${e.target.value}s`;
@@ -169,6 +255,28 @@ elements.displayArea.addEventListener('input', (e) => {
 
 elements.save.addEventListener('click', saveSettings);
 elements.reset.addEventListener('click', resetSettings);
+
+// Color swatch click handlers
+elements.colorOwner.addEventListener('click', () => openColorPicker('owner'));
+elements.colorModerator.addEventListener('click', () => openColorPicker('moderator'));
+elements.colorMember.addEventListener('click', () => openColorPicker('member'));
+elements.colorNormal.addEventListener('click', () => openColorPicker('normal'));
+
+// Color modal event handlers
+elements.colorModalClose.addEventListener('click', closeColorPicker);
+elements.colorCancel.addEventListener('click', closeColorPicker);
+elements.colorApply.addEventListener('click', applyColor);
+
+elements.redSlider.addEventListener('input', updateColorPreview);
+elements.greenSlider.addEventListener('input', updateColorPreview);
+elements.blueSlider.addEventListener('input', updateColorPreview);
+
+// Close modal when clicking outside
+elements.colorModal.addEventListener('click', (e) => {
+  if (e.target === elements.colorModal) {
+    closeColorPicker();
+  }
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {

@@ -6,7 +6,7 @@
   <title>Flow Chat for Holodex</title>
   <style>
     body {
-      width: 320px;
+      width: 360px;
       padding: 16px;
       font-family: "Segoe UI", Arial, sans-serif;
       background: #1a1a2e;
@@ -72,8 +72,8 @@
     }
 
     input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
     }
 
     .value-display {
@@ -146,10 +146,194 @@
       border: 1px solid #e74c3c;
       display: block;
     }
+
+    .section-title {
+      margin: 12px 0 8px 0;
+      font-size: 13px;
+      opacity: 0.8;
+      font-weight: 600;
+    }
+
+    .user-type-settings {
+      background: #16213e;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .user-type-header {
+      display: grid;
+      grid-template-columns: 90px 50px 50px 50px;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #888;
+      text-align: center;
+    }
+
+    .user-type-header span:first-child {
+      text-align: left;
+    }
+
+    .user-type-row {
+      display: grid;
+      grid-template-columns: 90px 50px 50px 50px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .user-type-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .user-type-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .user-type-row .checkbox-cell {
+      display: flex;
+      justify-content: center;
+    }
+
+    .color-picker-cell {
+      display: flex;
+      justify-content: center;
+    }
+
+    .color-swatch {
+      width: 32px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid #34495e;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .color-swatch:hover {
+      border-color: #4a90e2;
+    }
+
+    /* Color picker modal */
+    .color-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+    }
+
+    .color-modal.active {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .color-modal-content {
+      background: #1a1a2e;
+      border-radius: 8px;
+      padding: 16px;
+      width: 280px;
+      border: 2px solid #4a90e2;
+    }
+
+    .color-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .color-modal-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .color-modal-close {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+      width: auto;
+      margin: 0;
+    }
+
+    .color-modal-close:hover {
+      color: #eaeaea;
+      background: none;
+    }
+
+    .color-preview {
+      width: 100%;
+      height: 50px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      border: 2px solid #34495e;
+    }
+
+    .color-slider-group {
+      margin-bottom: 10px;
+    }
+
+    .color-slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .color-slider {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      background: linear-gradient(to right, #000, #f00);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .color-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #4a90e2;
+      cursor: pointer;
+    }
+
+    .color-slider.red {
+      background: linear-gradient(to right, #000, #f00);
+    }
+
+    .color-slider.green {
+      background: linear-gradient(to right, #000, #0f0);
+    }
+
+    .color-slider.blue {
+      background: linear-gradient(to right, #000, #00f);
+    }
+
+    .color-modal-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .color-modal-buttons button {
+      flex: 1;
+      margin: 0;
+      padding: 8px;
+    }
   </style>
 </head>
 <body>
-  <h1>💬 Flow Chat for Holodex</h1>
+  <h1>Flow Chat for Holodex</h1>
 
   <div id="status" class="status inactive">
     <span class="status-indicator"></span>
@@ -195,50 +379,68 @@
         <span class="value-display" id="displayArea-value">100%</span>
       </div>
     </label>
+  </div>
 
-    <div style="margin: 12px 0 8px 0; font-size: 13px; opacity: 0.8; font-weight: 600;">Show Comments:</div>
+  <div class="section-title">User Type Settings</div>
+  <div class="user-type-settings">
+    <div class="user-type-header">
+      <span>Type</span>
+      <span>Show</span>
+      <span>Avatar</span>
+      <span>Color</span>
+    </div>
 
-    <label>
-      <span>Owner</span>
-      <input type="checkbox" id="showOwner" checked>
-    </label>
+    <div class="user-type-row">
+      <span class="user-type-name">Owner</span>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="showOwner" checked>
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="avatarOwner" checked>
+      </div>
+      <div class="color-picker-cell">
+        <div class="color-swatch" id="colorOwner" data-type="owner"></div>
+      </div>
+    </div>
 
-    <label>
-      <span>Moderator</span>
-      <input type="checkbox" id="showModerator" checked>
-    </label>
+    <div class="user-type-row">
+      <span class="user-type-name">Moderator</span>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="showModerator" checked>
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="avatarModerator">
+      </div>
+      <div class="color-picker-cell">
+        <div class="color-swatch" id="colorModerator" data-type="moderator"></div>
+      </div>
+    </div>
 
-    <label>
-      <span>Member</span>
-      <input type="checkbox" id="showMember" checked>
-    </label>
+    <div class="user-type-row">
+      <span class="user-type-name">Member</span>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="showMember" checked>
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="avatarMember">
+      </div>
+      <div class="color-picker-cell">
+        <div class="color-swatch" id="colorMember" data-type="member"></div>
+      </div>
+    </div>
 
-    <label>
-      <span>Normal</span>
-      <input type="checkbox" id="showNormal" checked>
-    </label>
-
-    <div style="margin: 12px 0 8px 0; font-size: 13px; opacity: 0.8; font-weight: 600;">Show Avatar:</div>
-
-    <label>
-      <span>Owner</span>
-      <input type="checkbox" id="avatarOwner" checked>
-    </label>
-
-    <label>
-      <span>Moderator</span>
-      <input type="checkbox" id="avatarModerator">
-    </label>
-
-    <label>
-      <span>Member</span>
-      <input type="checkbox" id="avatarMember">
-    </label>
-
-    <label>
-      <span>Normal</span>
-      <input type="checkbox" id="avatarNormal">
-    </label>
+    <div class="user-type-row">
+      <span class="user-type-name">Normal</span>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="showNormal" checked>
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="avatarNormal">
+      </div>
+      <div class="color-picker-cell">
+        <div class="color-swatch" id="colorNormal" data-type="normal"></div>
+      </div>
+    </div>
   </div>
 
   <button id="save">Save Settings</button>
@@ -247,6 +449,42 @@
   <div class="footer">
     <p>Flow Chat for Holodex v1.0.0</p>
     <p>Works on <a href="https://holodex.net/multiview" target="_blank">holodex.net/multiview</a></p>
+  </div>
+
+  <!-- Color Picker Modal -->
+  <div id="colorModal" class="color-modal">
+    <div class="color-modal-content">
+      <div class="color-modal-header">
+        <span class="color-modal-title" id="colorModalTitle">Select Color</span>
+        <button class="color-modal-close" id="colorModalClose">&times;</button>
+      </div>
+      <div class="color-preview" id="colorPreview"></div>
+      <div class="color-slider-group">
+        <div class="color-slider-label">
+          <span>Red</span>
+          <span id="redValue">255</span>
+        </div>
+        <input type="range" class="color-slider red" id="redSlider" min="0" max="255" value="255">
+      </div>
+      <div class="color-slider-group">
+        <div class="color-slider-label">
+          <span>Green</span>
+          <span id="greenValue">255</span>
+        </div>
+        <input type="range" class="color-slider green" id="greenSlider" min="0" max="255" value="255">
+      </div>
+      <div class="color-slider-group">
+        <div class="color-slider-label">
+          <span>Blue</span>
+          <span id="blueValue">255</span>
+        </div>
+        <input type="range" class="color-slider blue" id="blueSlider" min="0" max="255" value="255">
+      </div>
+      <div class="color-modal-buttons">
+        <button id="colorApply">Apply</button>
+        <button id="colorCancel" class="secondary">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <script src="popup.js"></script>
