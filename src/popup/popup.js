@@ -6,10 +6,13 @@ const defaultSettings = {
   fontSize: 28,
   opacity: 1.0,
   maxMessages: 50,
-  showAuthor: true,
-  showAvatar: false,
+  showAuthor: false,
   displayArea: 1.0,
-  minVerticalGap: 4
+  minVerticalGap: 4,
+  avatarOwner: true,
+  avatarModerator: false,
+  avatarMember: false,
+  avatarNormal: false
 };
 
 let currentSettings = { ...defaultSettings };
@@ -29,7 +32,10 @@ const elements = {
   displayArea: document.getElementById('displayArea'),
   displayAreaValue: document.getElementById('displayArea-value'),
   showAuthor: document.getElementById('showAuthor'),
-  showAvatar: document.getElementById('showAvatar'),
+  avatarOwner: document.getElementById('avatarOwner'),
+  avatarModerator: document.getElementById('avatarModerator'),
+  avatarMember: document.getElementById('avatarMember'),
+  avatarNormal: document.getElementById('avatarNormal'),
   save: document.getElementById('save'),
   reset: document.getElementById('reset')
 };
@@ -56,7 +62,10 @@ function updateUI() {
   elements.displayArea.value = currentSettings.displayArea;
   elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
   elements.showAuthor.checked = currentSettings.showAuthor;
-  elements.showAvatar.checked = currentSettings.showAvatar;
+  elements.avatarOwner.checked = currentSettings.avatarOwner;
+  elements.avatarModerator.checked = currentSettings.avatarModerator;
+  elements.avatarMember.checked = currentSettings.avatarMember;
+  elements.avatarNormal.checked = currentSettings.avatarNormal;
 }
 
 // Save settings to storage
@@ -68,9 +77,12 @@ function saveSettings() {
     opacity: parseFloat(elements.opacity.value),
     maxMessages: currentSettings.maxMessages,
     showAuthor: elements.showAuthor.checked,
-    showAvatar: elements.showAvatar.checked,
     displayArea: parseFloat(elements.displayArea.value),
-    minVerticalGap: currentSettings.minVerticalGap
+    minVerticalGap: currentSettings.minVerticalGap,
+    avatarOwner: elements.avatarOwner.checked,
+    avatarModerator: elements.avatarModerator.checked,
+    avatarMember: elements.avatarMember.checked,
+    avatarNormal: elements.avatarNormal.checked
   };
 
   chrome.storage.sync.set({ flowChatSettings: currentSettings }, () => {

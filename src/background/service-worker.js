@@ -14,10 +14,13 @@ chrome.runtime.onInstalled.addListener((details) => {
         fontSize: 28,
         opacity: 1.0,
         maxMessages: 50,
-        showAuthor: true,
-        showAvatar: false,
+        showAuthor: false,
         displayArea: 1.0,
-        minVerticalGap: 4
+        minVerticalGap: 4,
+        avatarOwner: true,
+        avatarModerator: false,
+        avatarMember: false,
+        avatarNormal: false
       }
     });
   }

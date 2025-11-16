@@ -11,10 +11,14 @@
     fontSize: 28,    // pixels
     opacity: 1.0,
     maxMessages: 50, // max simultaneous messages
-    showAuthor: true,
-    showAvatar: false,
+    showAuthor: false, // hide username by default
     displayArea: 1.0, // percentage of screen height to use (0.0-1.0)
-    minVerticalGap: 4 // minimum pixels between messages vertically
+    minVerticalGap: 4, // minimum pixels between messages vertically
+    // Avatar settings per user type
+    avatarOwner: true,
+    avatarModerator: false,
+    avatarMember: false,
+    avatarNormal: false
   };
 
   let settings = { ...defaultSettings };
@@ -29,9 +33,19 @@
       if (result.flowChatSettings) {
         settings = { ...defaultSettings, ...result.flowChatSettings };
         updateStyles();
+        updateControlPanelUI();
       }
     });
   }
+
+  // Listen for storage changes (for immediate settings application)
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'sync' && changes.flowChatSettings) {
+      settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
+      updateControlPanelUI();
+      console.log('[FlowChat] Settings updated:', settings);
+    }
+  });
 
   // Save settings to storage
   function saveSettings() {
@@ -160,8 +174,25 @@
     messageEl.style.fontSize = `${settings.fontSize}px`;
     messageEl.style.opacity = settings.opacity;
 
-    // Add avatar if enabled
-    if (settings.showAvatar && chatData.avatar) {
+    // Add avatar based on user type settings
+    let showAvatar = false;
+    if (chatData.avatar) {
+      switch (chatData.type) {
+        case 'owner':
+          showAvatar = settings.avatarOwner;
+          break;
+        case 'moderator':
+          showAvatar = settings.avatarModerator;
+          break;
+        case 'member':
+          showAvatar = settings.avatarMember;
+          break;
+        default:
+          showAvatar = settings.avatarNormal;
+      }
+    }
+
+    if (showAvatar) {
       const avatar = document.createElement('img');
       avatar.className = 'flow-chat-avatar';
       avatar.src = chatData.avatar;
@@ -372,13 +403,30 @@
       </label>
 
       <label>
-        <span>Show Author</span>
+        <span>Show Author Name</span>
         <input type="checkbox" id="flow-show-author" ${settings.showAuthor ? 'checked' : ''}>
       </label>
 
+      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Avatar Display:</div>
+
       <label>
-        <span>Show Avatar</span>
-        <input type="checkbox" id="flow-show-avatar" ${settings.showAvatar ? 'checked' : ''}>
+        <span>Owner</span>
+        <input type="checkbox" id="flow-avatar-owner" ${settings.avatarOwner ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Moderator</span>
+        <input type="checkbox" id="flow-avatar-moderator" ${settings.avatarModerator ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Member</span>
+        <input type="checkbox" id="flow-avatar-member" ${settings.avatarMember ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Normal</span>
+        <input type="checkbox" id="flow-avatar-normal" ${settings.avatarNormal ? 'checked' : ''}>
       </label>
 
       <button id="flow-clear" class="danger">Clear All Messages</button>
@@ -416,8 +464,20 @@
       settings.showAuthor = e.target.checked;
     });
 
-    panel.querySelector('#flow-show-avatar').addEventListener('change', (e) => {
-      settings.showAvatar = e.target.checked;
+    panel.querySelector('#flow-avatar-owner').addEventListener('change', (e) => {
+      settings.avatarOwner = e.target.checked;
+    });
+
+    panel.querySelector('#flow-avatar-moderator').addEventListener('change', (e) => {
+      settings.avatarModerator = e.target.checked;
+    });
+
+    panel.querySelector('#flow-avatar-member').addEventListener('change', (e) => {
+      settings.avatarMember = e.target.checked;
+    });
+
+    panel.querySelector('#flow-avatar-normal').addEventListener('change', (e) => {
+      settings.avatarNormal = e.target.checked;
     });
 
     panel.querySelector('#flow-clear').addEventListener('click', () => {
@@ -431,6 +491,43 @@
       saveSettings();
       alert('Settings saved!');
     });
+  }
+
+  // Update control panel UI with current settings (for immediate sync)
+  function updateControlPanelUI() {
+    const panel = document.getElementById('flow-chat-controls');
+    if (!panel) return;
+
+    const enabledEl = panel.querySelector('#flow-enabled');
+    const speedEl = panel.querySelector('#flow-speed');
+    const fontSizeEl = panel.querySelector('#flow-font-size');
+    const opacityEl = panel.querySelector('#flow-opacity');
+    const displayAreaEl = panel.querySelector('#flow-display-area');
+    const showAuthorEl = panel.querySelector('#flow-show-author');
+    const avatarOwnerEl = panel.querySelector('#flow-avatar-owner');
+    const avatarModeratorEl = panel.querySelector('#flow-avatar-moderator');
+    const avatarMemberEl = panel.querySelector('#flow-avatar-member');
+    const avatarNormalEl = panel.querySelector('#flow-avatar-normal');
+
+    if (enabledEl) enabledEl.checked = settings.enabled;
+    if (speedEl) {
+      speedEl.value = settings.speed;
+      speedEl.previousElementSibling.textContent = `Speed (${settings.speed}px/s)`;
+    }
+    if (fontSizeEl) {
+      fontSizeEl.value = settings.fontSize;
+      fontSizeEl.previousElementSibling.textContent = `Size (${settings.fontSize}px)`;
+    }
+    if (opacityEl) opacityEl.value = settings.opacity;
+    if (displayAreaEl) {
+      displayAreaEl.value = settings.displayArea;
+      displayAreaEl.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
+    }
+    if (showAuthorEl) showAuthorEl.checked = settings.showAuthor;
+    if (avatarOwnerEl) avatarOwnerEl.checked = settings.avatarOwner;
+    if (avatarModeratorEl) avatarModeratorEl.checked = settings.avatarModerator;
+    if (avatarMemberEl) avatarMemberEl.checked = settings.avatarMember;
+    if (avatarNormalEl) avatarNormalEl.checked = settings.avatarNormal;
   }
 
   function showControls() {
