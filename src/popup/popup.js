@@ -2,14 +2,14 @@
 
 const defaultSettings = {
   enabled: true,
-  speed: 8,
+  speed: 160,
   fontSize: 28,
   opacity: 1.0,
   maxMessages: 50,
   showAuthor: true,
   showAvatar: false,
-  lanes: 12,
-  minLaneGap: 100
+  displayArea: 1.0,
+  minVerticalGap: 4
 };
 
 let currentSettings = { ...defaultSettings };
@@ -26,8 +26,8 @@ const elements = {
   fontSizeValue: document.getElementById('fontSize-value'),
   opacity: document.getElementById('opacity'),
   opacityValue: document.getElementById('opacity-value'),
-  lanes: document.getElementById('lanes'),
-  lanesValue: document.getElementById('lanes-value'),
+  displayArea: document.getElementById('displayArea'),
+  displayAreaValue: document.getElementById('displayArea-value'),
   showAuthor: document.getElementById('showAuthor'),
   showAvatar: document.getElementById('showAvatar'),
   save: document.getElementById('save'),
@@ -48,13 +48,13 @@ function loadSettings() {
 function updateUI() {
   elements.enabled.checked = currentSettings.enabled;
   elements.speed.value = currentSettings.speed;
-  elements.speedValue.textContent = `${currentSettings.speed}s`;
+  elements.speedValue.textContent = `${currentSettings.speed}px/s`;
   elements.fontSize.value = currentSettings.fontSize;
   elements.fontSizeValue.textContent = `${currentSettings.fontSize}px`;
   elements.opacity.value = currentSettings.opacity;
   elements.opacityValue.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
-  elements.lanes.value = currentSettings.lanes;
-  elements.lanesValue.textContent = currentSettings.lanes;
+  elements.displayArea.value = currentSettings.displayArea;
+  elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
   elements.showAuthor.checked = currentSettings.showAuthor;
   elements.showAvatar.checked = currentSettings.showAvatar;
 }
@@ -69,8 +69,8 @@ function saveSettings() {
     maxMessages: currentSettings.maxMessages,
     showAuthor: elements.showAuthor.checked,
     showAvatar: elements.showAvatar.checked,
-    lanes: parseInt(elements.lanes.value),
-    minLaneGap: currentSettings.minLaneGap
+    displayArea: parseFloat(elements.displayArea.value),
+    minVerticalGap: currentSettings.minVerticalGap
   };
 
   chrome.storage.sync.set({ flowChatSettings: currentSettings }, () => {
@@ -128,7 +128,7 @@ function checkCurrentTab() {
 
 // Event listeners
 elements.speed.addEventListener('input', (e) => {
-  elements.speedValue.textContent = `${e.target.value}s`;
+  elements.speedValue.textContent = `${e.target.value}px/s`;
 });
 
 elements.fontSize.addEventListener('input', (e) => {
@@ -139,8 +139,8 @@ elements.opacity.addEventListener('input', (e) => {
   elements.opacityValue.textContent = `${Math.round(e.target.value * 100)}%`;
 });
 
-elements.lanes.addEventListener('input', (e) => {
-  elements.lanesValue.textContent = e.target.value;
+elements.displayArea.addEventListener('input', (e) => {
+  elements.displayAreaValue.textContent = `${Math.round(e.target.value * 100)}%`;
 });
 
 elements.save.addEventListener('click', saveSettings);

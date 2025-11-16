@@ -7,22 +7,21 @@
   // Default settings
   const defaultSettings = {
     enabled: true,
-    speed: 8,        // seconds to cross screen
+    speed: 160,      // pixels per second (fixed speed)
     fontSize: 28,    // pixels
     opacity: 1.0,
     maxMessages: 50, // max simultaneous messages
     showAuthor: true,
     showAvatar: false,
-    lanes: 12,       // number of horizontal lanes
-    minLaneGap: 100  // minimum pixels between messages in same lane
+    displayArea: 1.0, // percentage of screen height to use (0.0-1.0)
+    minVerticalGap: 4 // minimum pixels between messages vertically
   };
 
   let settings = { ...defaultSettings };
   let flowContainers = new Map(); // videoId -> container element
-  let activeLanes = new Map();    // videoId -> lane usage tracking (now stores {endTime, width})
+  let activeMessages = new Map(); // videoId -> array of active message info
   let messageCount = 0;
   let controlsVisible = false;
-  let messageQueue = new Map();   // videoId -> queue of pending messages
 
   // Load settings from storage
   function loadSettings() {
@@ -69,57 +68,80 @@
 
     videoCell.appendChild(container);
     flowContainers.set(videoId, container);
-    activeLanes.set(videoId, new Array(settings.lanes).fill({ endTime: 0, width: 0 }));
-    messageQueue.set(videoId, []);
+    activeMessages.set(videoId, []);
 
     return container;
   }
 
-  // Get available lane for message - checks if lane is clear for new message
-  function getAvailableLane(videoId, messageWidth, containerWidth) {
-    const lanes = activeLanes.get(videoId);
-    if (!lanes) return -1;
+  // Check if two messages would collide
+  function wouldCollide(msg1, msg2, containerWidth) {
+    // Vertical overlap check
+    if (msg1.top + msg1.height + settings.minVerticalGap <= msg2.top ||
+        msg2.top + msg2.height + settings.minVerticalGap <= msg1.top) {
+      return false; // No vertical overlap
+    }
 
+    // Horizontal collision check (do they overlap in time and space?)
+    // Calculate positions at current time
     const now = Date.now();
-    const animationDuration = settings.speed * 1000; // ms
 
-    // Calculate when the new message's tail will clear the right edge
-    // Message travels (containerWidth + messageWidth) in animationDuration ms
-    // Tail clears right edge when: time = messageWidth / totalDistance * animationDuration
-    const totalDistance = containerWidth + messageWidth;
-    const tailClearTime = (messageWidth / totalDistance) * animationDuration;
+    // Message position: starts at containerWidth, moves left at speed px/s
+    // position = containerWidth - speed * (now - startTime) / 1000
+    const msg1Left = containerWidth - settings.speed * (now - msg1.startTime) / 1000;
+    const msg1Right = msg1Left + msg1.width;
 
-    let bestLane = -1;
-    let earliestAvailable = Infinity;
+    const msg2Left = containerWidth - settings.speed * (now - msg2.startTime) / 1000;
+    const msg2Right = msg2Left + msg2.width;
 
-    for (let i = 0; i < lanes.length; i++) {
-      const laneInfo = lanes[i];
+    // Check if msg1's right edge has passed msg2's left edge
+    // New message (msg2) should not overlap with existing message (msg1)
+    // Check: will the new message catch up or collide with existing one?
 
-      // Check if lane is available (previous message's tail has cleared)
-      if (now >= laneInfo.endTime) {
-        bestLane = i;
-        break;
+    // If msg1 is ahead (started earlier), check if msg2 would hit it
+    // Since both move at same speed, if msg1Right > msg2Left now, they collide
+    // Also need to ensure new message tail doesn't get hit by existing message head
+
+    // Simple overlap check: if horizontal ranges overlap now, they'll stay overlapped
+    if (msg1Right > msg2Left && msg1Left < msg2Right) {
+      return true; // Collision
+    }
+
+    return false;
+  }
+
+  // Find available Y position for new message
+  function findAvailablePosition(videoId, messageWidth, messageHeight, containerWidth, containerHeight) {
+    const messages = activeMessages.get(videoId) || [];
+    const maxY = containerHeight * settings.displayArea - messageHeight;
+
+    // Try to place message at each possible Y position
+    // Start from top, find first non-colliding position
+    const step = messageHeight + settings.minVerticalGap;
+
+    for (let y = 0; y <= maxY; y += step) {
+      const newMsg = {
+        top: y,
+        height: messageHeight,
+        width: messageWidth,
+        startTime: Date.now()
+      };
+
+      let hasCollision = false;
+
+      for (const existingMsg of messages) {
+        if (wouldCollide(existingMsg, newMsg, containerWidth)) {
+          hasCollision = true;
+          break;
+        }
       }
 
-      // Track which lane will be available soonest
-      if (laneInfo.endTime < earliestAvailable) {
-        earliestAvailable = laneInfo.endTime;
-        bestLane = i;
+      if (!hasCollision) {
+        return y;
       }
     }
 
-    // If no lane is immediately available, return -1 to skip this message
-    if (bestLane === -1 || (now < lanes[bestLane].endTime)) {
-      return -1; // No available lane, skip message
-    }
-
-    // Update lane info
-    lanes[bestLane] = {
-      endTime: now + tailClearTime + 100, // Add small buffer
-      width: messageWidth
-    };
-
-    return bestLane;
+    // No available position found
+    return -1;
   }
 
   // Create flow message element
@@ -189,39 +211,61 @@
     messageEl.style.left = '-9999px';
     container.appendChild(messageEl);
 
-    // Get actual message width
+    // Get actual message dimensions
     const messageWidth = messageEl.offsetWidth;
+    const messageHeight = messageEl.offsetHeight;
     const containerWidth = container.offsetWidth;
     const containerHeight = container.offsetHeight;
 
-    // Find available lane (considering message width)
-    const lane = getAvailableLane(chatData.videoId, messageWidth, containerWidth);
+    // Find available Y position (collision detection)
+    const topPosition = findAvailablePosition(
+      chatData.videoId,
+      messageWidth,
+      messageHeight,
+      containerWidth,
+      containerHeight
+    );
 
-    if (lane === -1) {
-      // No available lane, remove message and skip
+    if (topPosition === -1) {
+      // No available position, remove message and skip
       messageEl.remove();
       return;
     }
 
-    // Calculate lane position
-    const messageHeight = settings.fontSize * 1.5;
-    const laneHeight = containerHeight / settings.lanes;
-    const topPosition = lane * laneHeight;
+    // Calculate animation duration based on fixed speed (pixels per second)
+    const totalDistance = containerWidth + messageWidth;
+    const animationDuration = totalDistance / settings.speed; // seconds
+
+    // Track this message for collision detection
+    const messageInfo = {
+      top: topPosition,
+      height: messageHeight,
+      width: messageWidth,
+      startTime: Date.now(),
+      element: messageEl
+    };
+
+    const messages = activeMessages.get(chatData.videoId);
+    messages.push(messageInfo);
 
     // Reset positioning for animation
     messageEl.style.visibility = 'visible';
     messageEl.style.position = 'absolute';
     messageEl.style.left = '100%'; // Start from right edge
-    messageEl.style.top = `${Math.min(topPosition, containerHeight - messageHeight)}px`;
+    messageEl.style.top = `${topPosition}px`;
 
-    // Set custom animation with proper distance
-    const totalDistance = containerWidth + messageWidth;
+    // Set custom animation with proper distance and fixed speed
     messageEl.style.setProperty('--flow-distance', `-${totalDistance}px`);
-    messageEl.style.animationDuration = `${settings.speed}s`;
+    messageEl.style.animationDuration = `${animationDuration}s`;
 
     // Remove after animation
     messageEl.addEventListener('animationend', () => {
       messageEl.remove();
+      // Remove from active messages
+      const idx = messages.indexOf(messageInfo);
+      if (idx > -1) {
+        messages.splice(idx, 1);
+      }
       messageCount--;
     });
 
@@ -308,8 +352,8 @@
       </label>
 
       <label>
-        <span>Speed (${settings.speed}s)</span>
-        <input type="range" id="flow-speed" min="3" max="15" value="${settings.speed}">
+        <span>Speed (${settings.speed}px/s)</span>
+        <input type="range" id="flow-speed" min="80" max="400" step="20" value="${settings.speed}">
       </label>
 
       <label>
@@ -323,8 +367,8 @@
       </label>
 
       <label>
-        <span>Lanes (${settings.lanes})</span>
-        <input type="range" id="flow-lanes" min="4" max="20" value="${settings.lanes}">
+        <span>Display Area (${Math.round(settings.displayArea * 100)}%)</span>
+        <input type="range" id="flow-display-area" min="0.3" max="1" step="0.1" value="${settings.displayArea}">
       </label>
 
       <label>
@@ -351,7 +395,7 @@
 
     panel.querySelector('#flow-speed').addEventListener('input', (e) => {
       settings.speed = parseInt(e.target.value);
-      e.target.previousElementSibling.textContent = `Speed (${settings.speed}s)`;
+      e.target.previousElementSibling.textContent = `Speed (${settings.speed}px/s)`;
     });
 
     panel.querySelector('#flow-font-size').addEventListener('input', (e) => {
@@ -363,13 +407,9 @@
       settings.opacity = parseFloat(e.target.value);
     });
 
-    panel.querySelector('#flow-lanes').addEventListener('input', (e) => {
-      settings.lanes = parseInt(e.target.value);
-      e.target.previousElementSibling.textContent = `Lanes (${settings.lanes})`;
-      // Reset lane tracking with new structure
-      activeLanes.forEach((lanes, videoId) => {
-        activeLanes.set(videoId, new Array(settings.lanes).fill({ endTime: 0, width: 0 }));
-      });
+    panel.querySelector('#flow-display-area').addEventListener('input', (e) => {
+      settings.displayArea = parseFloat(e.target.value);
+      e.target.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
     });
 
     panel.querySelector('#flow-show-author').addEventListener('change', (e) => {

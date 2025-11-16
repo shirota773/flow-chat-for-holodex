@@ -10,14 +10,14 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.sync.set({
       flowChatSettings: {
         enabled: true,
-        speed: 8,
+        speed: 160,
         fontSize: 28,
         opacity: 1.0,
         maxMessages: 50,
         showAuthor: true,
         showAvatar: false,
-        lanes: 12,
-        minLaneGap: 100
+        displayArea: 1.0,
+        minVerticalGap: 4
       }
     });
   }
