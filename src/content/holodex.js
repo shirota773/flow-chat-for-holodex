@@ -19,9 +19,10 @@
 
   let settings = { ...defaultSettings };
   let flowContainers = new Map(); // videoId -> container element
-  let activeLanes = new Map();    // videoId -> lane usage tracking
+  let activeLanes = new Map();    // videoId -> lane usage tracking (now stores {endTime, width})
   let messageCount = 0;
   let controlsVisible = false;
+  let messageQueue = new Map();   // videoId -> queue of pending messages
 
   // Load settings from storage
   function loadSettings() {
@@ -68,32 +69,56 @@
 
     videoCell.appendChild(container);
     flowContainers.set(videoId, container);
-    activeLanes.set(videoId, new Array(settings.lanes).fill(0));
+    activeLanes.set(videoId, new Array(settings.lanes).fill({ endTime: 0, width: 0 }));
+    messageQueue.set(videoId, []);
 
     return container;
   }
 
-  // Get available lane for message
-  function getAvailableLane(videoId) {
+  // Get available lane for message - checks if lane is clear for new message
+  function getAvailableLane(videoId, messageWidth, containerWidth) {
     const lanes = activeLanes.get(videoId);
-    if (!lanes) return 0;
+    if (!lanes) return -1;
 
     const now = Date.now();
-    let bestLane = 0;
-    let oldestTime = Infinity;
+    const animationDuration = settings.speed * 1000; // ms
+
+    // Calculate when the new message's tail will clear the right edge
+    // Message travels (containerWidth + messageWidth) in animationDuration ms
+    // Tail clears right edge when: time = messageWidth / totalDistance * animationDuration
+    const totalDistance = containerWidth + messageWidth;
+    const tailClearTime = (messageWidth / totalDistance) * animationDuration;
+
+    let bestLane = -1;
+    let earliestAvailable = Infinity;
 
     for (let i = 0; i < lanes.length; i++) {
-      if (now - lanes[i] > settings.minLaneGap) {
+      const laneInfo = lanes[i];
+
+      // Check if lane is available (previous message's tail has cleared)
+      if (now >= laneInfo.endTime) {
         bestLane = i;
         break;
       }
-      if (lanes[i] < oldestTime) {
-        oldestTime = lanes[i];
+
+      // Track which lane will be available soonest
+      if (laneInfo.endTime < earliestAvailable) {
+        earliestAvailable = laneInfo.endTime;
         bestLane = i;
       }
     }
 
-    lanes[bestLane] = now;
+    // If no lane is immediately available, return -1 to skip this message
+    if (bestLane === -1 || (now < lanes[bestLane].endTime)) {
+      return -1; // No available lane, skip message
+    }
+
+    // Update lane info
+    lanes[bestLane] = {
+      endTime: now + tailClearTime + 100, // Add small buffer
+      width: messageWidth
+    };
+
     return bestLane;
   }
 
@@ -104,7 +129,8 @@
 
     // Limit simultaneous messages
     if (container.children.length >= settings.maxMessages) {
-      container.removeChild(container.firstChild);
+      // Skip this message if at capacity
+      return;
     }
 
     const messageEl = document.createElement('div');
@@ -129,19 +155,68 @@
       messageEl.appendChild(author);
     }
 
-    // Add message text
-    const text = document.createElement('span');
-    text.textContent = chatData.message;
-    messageEl.appendChild(text);
+    // Add message content (text and emoji/sticker images)
+    const messageContent = document.createElement('span');
+    messageContent.className = 'flow-chat-content';
 
-    // Position in lane
-    const lane = getAvailableLane(chatData.videoId);
+    if (chatData.fragments && Array.isArray(chatData.fragments)) {
+      chatData.fragments.forEach(fragment => {
+        if (fragment.type === 'text') {
+          const textNode = document.createTextNode(fragment.content);
+          messageContent.appendChild(textNode);
+        } else if (fragment.type === 'emoji') {
+          const emojiImg = document.createElement('img');
+          emojiImg.className = 'flow-chat-emoji';
+          emojiImg.src = fragment.src;
+          emojiImg.alt = fragment.alt || '';
+          emojiImg.style.height = `${settings.fontSize}px`;
+          emojiImg.style.width = 'auto';
+          emojiImg.style.verticalAlign = 'middle';
+          emojiImg.style.display = 'inline';
+          messageContent.appendChild(emojiImg);
+        }
+      });
+    } else if (chatData.message) {
+      // Fallback for old format
+      messageContent.textContent = chatData.message;
+    }
+
+    messageEl.appendChild(messageContent);
+
+    // Temporarily add to DOM to measure width (hidden)
+    messageEl.style.visibility = 'hidden';
+    messageEl.style.position = 'absolute';
+    messageEl.style.left = '-9999px';
+    container.appendChild(messageEl);
+
+    // Get actual message width
+    const messageWidth = messageEl.offsetWidth;
+    const containerWidth = container.offsetWidth;
     const containerHeight = container.offsetHeight;
+
+    // Find available lane (considering message width)
+    const lane = getAvailableLane(chatData.videoId, messageWidth, containerWidth);
+
+    if (lane === -1) {
+      // No available lane, remove message and skip
+      messageEl.remove();
+      return;
+    }
+
+    // Calculate lane position
     const messageHeight = settings.fontSize * 1.5;
     const laneHeight = containerHeight / settings.lanes;
     const topPosition = lane * laneHeight;
 
+    // Reset positioning for animation
+    messageEl.style.visibility = 'visible';
+    messageEl.style.position = 'absolute';
+    messageEl.style.left = '100%'; // Start from right edge
     messageEl.style.top = `${Math.min(topPosition, containerHeight - messageHeight)}px`;
+
+    // Set custom animation with proper distance
+    const totalDistance = containerWidth + messageWidth;
+    messageEl.style.setProperty('--flow-distance', `-${totalDistance}px`);
     messageEl.style.animationDuration = `${settings.speed}s`;
 
     // Remove after animation
@@ -150,7 +225,6 @@
       messageCount--;
     });
 
-    container.appendChild(messageEl);
     messageCount++;
   }
 
@@ -292,9 +366,9 @@
     panel.querySelector('#flow-lanes').addEventListener('input', (e) => {
       settings.lanes = parseInt(e.target.value);
       e.target.previousElementSibling.textContent = `Lanes (${settings.lanes})`;
-      // Reset lane tracking
+      // Reset lane tracking with new structure
       activeLanes.forEach((lanes, videoId) => {
-        activeLanes.set(videoId, new Array(settings.lanes).fill(0));
+        activeLanes.set(videoId, new Array(settings.lanes).fill({ endTime: 0, width: 0 }));
       });
     });
 

@@ -24,9 +24,10 @@
     0 0 3px rgba(0, 0, 0, 0.8);
   animation: flowAnimation linear forwards;
   pointer-events: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  --flow-distance: -200%; /* Default, will be overridden by JS */
 }
 
 .flow-chat-message.normal {
@@ -70,11 +71,22 @@
 
 @keyframes flowAnimation {
   0% {
-    transform: translateX(100%);
+    transform: translateX(0);
   }
   100% {
-    transform: translateX(-100%);
+    transform: translateX(var(--flow-distance, -200%));
   }
+}
+
+.flow-chat-emoji {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+
+.flow-chat-content {
+  display: inline;
+  vertical-align: middle;
 }
 
 /* Control Panel */

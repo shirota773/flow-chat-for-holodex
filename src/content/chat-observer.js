@@ -46,18 +46,29 @@
 
     // Get message content
     const messageElement = element.querySelector('#message');
-    let messageText = '';
+    let messageFragments = []; // Array of {type: 'text'|'emoji', content: string}
     let hasEmoji = false;
 
     if (messageElement) {
-      // Handle both text and emoji
+      // Handle both text and emoji/sticker images
       messageElement.childNodes.forEach(node => {
         if (node.nodeType === Node.TEXT_NODE) {
-          messageText += node.textContent;
+          const text = node.textContent.trim();
+          if (text) {
+            messageFragments.push({ type: 'text', content: text });
+          }
         } else if (node.nodeName === 'IMG') {
-          // Emoji
-          messageText += node.alt || '😊';
-          hasEmoji = true;
+          // Emoji or sticker - preserve image source
+          const imgSrc = node.src || '';
+          const imgAlt = node.alt || '';
+          if (imgSrc) {
+            messageFragments.push({
+              type: 'emoji',
+              src: imgSrc,
+              alt: imgAlt
+            });
+            hasEmoji = true;
+          }
         }
       });
     }
@@ -91,7 +102,7 @@
       videoId: getVideoId(),
       author: authorName,
       avatar: avatarUrl,
-      message: messageText.trim(),
+      fragments: messageFragments, // Array of text/emoji fragments
       type: type,
       timestamp: Date.now(),
       hasEmoji: hasEmoji
@@ -100,7 +111,7 @@
 
   // Send message to parent window (Holodex)
   function sendToParent(chatData) {
-    if (!isEnabled || !chatData || !chatData.message) return;
+    if (!isEnabled || !chatData || !chatData.fragments || chatData.fragments.length === 0) return;
 
     try {
       window.parent.postMessage({
