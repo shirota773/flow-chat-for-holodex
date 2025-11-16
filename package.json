@@ -1,0 +1,29 @@
+{
+  "name": "flow-chat-for-holodex",
+  "version": "1.0.0",
+  "description": "Display YouTube Live Chat messages as flowing text overlay on Holodex multiview",
+  "main": "src/background/service-worker.js",
+  "scripts": {
+    "lint": "eslint src/",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shirota773/flow-chat-for-holodex.git"
+  },
+  "keywords": [
+    "chrome-extension",
+    "holodex",
+    "youtube",
+    "live-chat",
+    "flow-chat",
+    "vtuber"
+  ],
+  "author": "shirota773",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shirota773/flow-chat-for-holodex/issues"
+  },
+  "homepage": "https://github.com/shirota773/flow-chat-for-holodex#readme",
+  "devDependencies": {}
+}

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flow Chat for Holodex</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #1a1a2e;
+      color: #eaeaea;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #4a90e2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status {
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .status.active {
+      border: 2px solid #2ecc71;
+    }
+
+    .status.inactive {
+      border: 2px solid #e74c3c;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status.active .status-indicator {
+      background: #2ecc71;
+    }
+
+    .status.inactive .status-indicator {
+      background: #e74c3c;
+    }
+
+    .setting-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="range"] {
+      width: 120px;
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+    }
+
+    .value-display {
+      font-size: 12px;
+      color: #888;
+      margin-left: 8px;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #4a90e2;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #357abd;
+    }
+
+    button.secondary {
+      background: #34495e;
+    }
+
+    button.secondary:hover {
+      background: #2c3e50;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #34495e;
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+    }
+
+    .footer a {
+      color: #4a90e2;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .message {
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .message.success {
+      background: #27ae6033;
+      border: 1px solid #27ae60;
+      display: block;
+    }
+
+    .message.error {
+      background: #e74c3c33;
+      border: 1px solid #e74c3c;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>💬 Flow Chat for Holodex</h1>
+
+  <div id="status" class="status inactive">
+    <span class="status-indicator"></span>
+    <span id="status-text">Not on Holodex Multiview</span>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <div class="setting-group">
+    <label>
+      <span>Enable Flow Chat</span>
+      <input type="checkbox" id="enabled" checked>
+    </label>
+
+    <label>
+      <span>Speed</span>
+      <div>
+        <input type="range" id="speed" min="3" max="15" value="8">
+        <span class="value-display" id="speed-value">8s</span>
+      </div>
+    </label>
+
+    <label>
+      <span>Font Size</span>
+      <div>
+        <input type="range" id="fontSize" min="16" max="48" value="28">
+        <span class="value-display" id="fontSize-value">28px</span>
+      </div>
+    </label>
+
+    <label>
+      <span>Opacity</span>
+      <div>
+        <input type="range" id="opacity" min="0.3" max="1" step="0.1" value="1">
+        <span class="value-display" id="opacity-value">100%</span>
+      </div>
+    </label>
+
+    <label>
+      <span>Lanes</span>
+      <div>
+        <input type="range" id="lanes" min="4" max="20" value="12">
+        <span class="value-display" id="lanes-value">12</span>
+      </div>
+    </label>
+
+    <label>
+      <span>Show Author Name</span>
+      <input type="checkbox" id="showAuthor" checked>
+    </label>
+
+    <label>
+      <span>Show Avatar</span>
+      <input type="checkbox" id="showAvatar">
+    </label>
+  </div>
+
+  <button id="save">Save Settings</button>
+  <button id="reset" class="secondary">Reset to Defaults</button>
+
+  <div class="footer">
+    <p>Flow Chat for Holodex v1.0.0</p>
+    <p>Works on <a href="https://holodex.net/multiview" target="_blank">holodex.net/multiview</a></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
