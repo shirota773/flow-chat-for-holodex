@@ -132,7 +132,20 @@ MIT License
 
 ## 謝辞
 
-このプロジェクトは [youtube-live-chat-flow](https://github.com/tsukumijima/youtube-live-chat-flow) にインスパイアされています。
+- **[Holodex](https://holodex.net/)** - VTuber コンテンツのための素晴らしいプラットフォームを提供していただきありがとうございます
+- **[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)** - Anthropic の AI コーディングアシスタント。この拡張機能の設計・実装を全面的に支援していただきました
+- **[youtube-live-chat-flow](https://github.com/tsukumijima/youtube-live-chat-flow)** - ニコニコ動画風チャット表示のインスピレーションを与えていただきました
+
+### Claude Code による開発
+
+このプロジェクトは **Claude Code** を使用して作成されました。以下の機能が Claude Code との対話を通じて実装されています：
+
+- Chrome Extension Manifest V3 構造の設計
+- クロスオリジン通信（postMessage API）
+- 衝突検出アルゴリズムによるメッセージ配置
+- ユーザータイプ別フィルタリング・色設定
+- RGB カラーピッカーとカラーパレット UI
+- 設定の即時反映機能
 
 ## 貢献
 
@@ -147,3 +160,5 @@ Issue報告やPull Requestを歓迎します。
 ---
 
 Made with ❤️ for the VTuber community
+
+*Developed with [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) by Anthropic*
