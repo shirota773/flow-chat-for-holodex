@@ -330,6 +330,44 @@
       margin: 0;
       padding: 8px;
     }
+
+    .color-palette {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .palette-color {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.2s;
+    }
+
+    .palette-color:hover {
+      transform: scale(1.1);
+      border-color: #4a90e2;
+    }
+
+    .palette-color.selected {
+      border-color: #fff;
+      box-shadow: 0 0 0 2px #4a90e2;
+    }
+
+    .palette-label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .slider-section-label {
+      font-size: 11px;
+      color: #888;
+      margin: 8px 0 6px 0;
+    }
   </style>
 </head>
 <body>
@@ -459,6 +497,13 @@
         <button class="color-modal-close" id="colorModalClose">&times;</button>
       </div>
       <div class="color-preview" id="colorPreview"></div>
+
+      <div class="palette-label">Color Palette</div>
+      <div class="color-palette" id="colorPalette">
+        <!-- Colors will be added by JavaScript -->
+      </div>
+
+      <div class="slider-section-label">Fine Tune (RGB)</div>
       <div class="color-slider-group">
         <div class="color-slider-label">
           <span>Red</span>

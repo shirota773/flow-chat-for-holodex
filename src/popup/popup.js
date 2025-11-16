@@ -25,6 +25,69 @@ const defaultSettings = {
 let currentSettings = { ...defaultSettings };
 let currentColorType = null;
 
+// Predefined color palette
+const colorPalette = [
+  // Row 1: Whites and grays
+  { r: 255, g: 255, b: 255 }, // White
+  { r: 220, g: 220, b: 220 }, // Light gray
+  { r: 180, g: 180, b: 180 }, // Gray
+  { r: 128, g: 128, b: 128 }, // Dark gray
+  { r: 255, g: 255, b: 224 }, // Light yellow
+  { r: 255, g: 250, b: 205 }, // Lemon chiffon
+  { r: 255, g: 245, b: 238 }, // Seashell
+  { r: 245, g: 245, b: 245 }, // White smoke
+
+  // Row 2: Yellows and oranges
+  { r: 255, g: 255, b: 0 },   // Yellow
+  { r: 255, g: 215, b: 0 },   // Gold
+  { r: 255, g: 193, b: 37 },  // Golden rod
+  { r: 255, g: 165, b: 0 },   // Orange
+  { r: 255, g: 140, b: 0 },   // Dark orange
+  { r: 255, g: 127, b: 80 },  // Coral
+  { r: 255, g: 99, b: 71 },   // Tomato
+  { r: 255, g: 69, b: 0 },    // Orange red
+
+  // Row 3: Reds and pinks
+  { r: 255, g: 0, b: 0 },     // Red
+  { r: 220, g: 20, b: 60 },   // Crimson
+  { r: 255, g: 105, b: 180 }, // Hot pink
+  { r: 255, g: 182, b: 193 }, // Light pink
+  { r: 255, g: 192, b: 203 }, // Pink
+  { r: 219, g: 112, b: 147 }, // Pale violet red
+  { r: 199, g: 21, b: 133 },  // Medium violet red
+  { r: 148, g: 0, b: 211 },   // Dark violet
+
+  // Row 4: Purples and blues
+  { r: 138, g: 43, b: 226 },  // Blue violet
+  { r: 147, g: 112, b: 219 }, // Medium purple
+  { r: 186, g: 85, b: 211 },  // Medium orchid
+  { r: 153, g: 50, b: 204 },  // Dark orchid
+  { r: 75, g: 0, b: 130 },    // Indigo
+  { r: 106, g: 90, b: 205 },  // Slate blue
+  { r: 94, g: 132, b: 241 },  // Custom blue
+  { r: 65, g: 105, b: 225 },  // Royal blue
+
+  // Row 5: Blues
+  { r: 0, g: 0, b: 255 },     // Blue
+  { r: 30, g: 144, b: 255 },  // Dodger blue
+  { r: 0, g: 191, b: 255 },   // Deep sky blue
+  { r: 135, g: 206, b: 250 }, // Light sky blue
+  { r: 173, g: 216, b: 230 }, // Light blue
+  { r: 176, g: 224, b: 230 }, // Powder blue
+  { r: 0, g: 255, b: 255 },   // Cyan
+  { r: 127, g: 255, b: 212 }, // Aquamarine
+
+  // Row 6: Greens
+  { r: 0, g: 255, b: 127 },   // Spring green
+  { r: 46, g: 204, b: 113 },  // Custom green
+  { r: 0, g: 255, b: 0 },     // Lime
+  { r: 50, g: 205, b: 50 },   // Lime green
+  { r: 144, g: 238, b: 144 }, // Light green
+  { r: 152, g: 251, b: 152 }, // Pale green
+  { r: 34, g: 139, b: 34 },   // Forest green
+  { r: 0, g: 128, b: 0 }      // Green
+];
+
 // DOM elements
 const elements = {
   status: document.getElementById('status'),
@@ -58,6 +121,7 @@ const elements = {
   colorModalTitle: document.getElementById('colorModalTitle'),
   colorModalClose: document.getElementById('colorModalClose'),
   colorPreview: document.getElementById('colorPreview'),
+  colorPaletteContainer: document.getElementById('colorPalette'),
   redSlider: document.getElementById('redSlider'),
   greenSlider: document.getElementById('greenSlider'),
   blueSlider: document.getElementById('blueSlider'),
@@ -187,6 +251,51 @@ function checkCurrentTab() {
   });
 }
 
+// Initialize color palette
+function initColorPalette() {
+  elements.colorPaletteContainer.innerHTML = '';
+
+  colorPalette.forEach((color, index) => {
+    const colorBtn = document.createElement('div');
+    colorBtn.className = 'palette-color';
+    colorBtn.style.backgroundColor = rgbToString(color);
+    colorBtn.dataset.index = index;
+
+    colorBtn.addEventListener('click', () => {
+      selectPaletteColor(color);
+    });
+
+    elements.colorPaletteContainer.appendChild(colorBtn);
+  });
+}
+
+function selectPaletteColor(color) {
+  elements.redSlider.value = color.r;
+  elements.greenSlider.value = color.g;
+  elements.blueSlider.value = color.b;
+  updateColorPreview();
+  updatePaletteSelection();
+}
+
+function updatePaletteSelection() {
+  const r = parseInt(elements.redSlider.value);
+  const g = parseInt(elements.greenSlider.value);
+  const b = parseInt(elements.blueSlider.value);
+
+  // Remove all selections
+  document.querySelectorAll('.palette-color').forEach(btn => {
+    btn.classList.remove('selected');
+  });
+
+  // Find matching color in palette
+  colorPalette.forEach((color, index) => {
+    if (color.r === r && color.g === g && color.b === b) {
+      const btn = elements.colorPaletteContainer.children[index];
+      if (btn) btn.classList.add('selected');
+    }
+  });
+}
+
 // Color picker modal functions
 function openColorPicker(type) {
   currentColorType = type;
@@ -198,6 +307,7 @@ function openColorPicker(type) {
   elements.greenSlider.value = color.g;
   elements.blueSlider.value = color.b;
   updateColorPreview();
+  updatePaletteSelection();
 
   elements.colorModal.classList.add('active');
 }
@@ -267,9 +377,18 @@ elements.colorModalClose.addEventListener('click', closeColorPicker);
 elements.colorCancel.addEventListener('click', closeColorPicker);
 elements.colorApply.addEventListener('click', applyColor);
 
-elements.redSlider.addEventListener('input', updateColorPreview);
-elements.greenSlider.addEventListener('input', updateColorPreview);
-elements.blueSlider.addEventListener('input', updateColorPreview);
+elements.redSlider.addEventListener('input', () => {
+  updateColorPreview();
+  updatePaletteSelection();
+});
+elements.greenSlider.addEventListener('input', () => {
+  updateColorPreview();
+  updatePaletteSelection();
+});
+elements.blueSlider.addEventListener('input', () => {
+  updateColorPreview();
+  updatePaletteSelection();
+});
 
 // Close modal when clicking outside
 elements.colorModal.addEventListener('click', (e) => {
@@ -280,6 +399,7 @@ elements.colorModal.addEventListener('click', (e) => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+  initColorPalette();
   loadSettings();
   checkCurrentTab();
 });
