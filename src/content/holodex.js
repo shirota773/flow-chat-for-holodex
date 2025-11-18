@@ -61,16 +61,46 @@
     chrome.storage.sync.set({ flowChatSettings: settings });
   }
 
-  // Find all video cells in Holodex multiview
+  // Find all video cells in Holodex (multiview and watch pages)
   function findVideoCells() {
-    // Holodex uses a grid of video cells
-    const cells = document.querySelectorAll('.video-cell, [class*="cell"], .v-responsive');
-    return Array.from(cells).filter(cell => {
-      // Filter to cells that contain video iframes
-      return cell.querySelector('iframe[src*="youtube.com/embed"]') ||
-             cell.querySelector('video') ||
-             cell.querySelector('[class*="player"]');
+    const cells = [];
+
+    // Find all YouTube iframes
+    const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
+
+    iframes.forEach(iframe => {
+      // Try to find a suitable parent container
+      // For multiview: .video-cell, [class*="cell"], .v-responsive
+      // For watch page: Find the closest container with reasonable size
+      let container = iframe.closest('.video-cell, [class*="video"], .v-responsive');
+
+      if (!container) {
+        // If no specific container found, use a parent that's likely the video container
+        let parent = iframe.parentElement;
+        let depth = 0;
+
+        while (parent && depth < 5) {
+          const style = window.getComputedStyle(parent);
+          const width = parent.offsetWidth;
+          const height = parent.offsetHeight;
+
+          // Look for a container that's reasonably sized (likely the video player container)
+          if (width > 300 && height > 200) {
+            container = parent;
+            break;
+          }
+
+          parent = parent.parentElement;
+          depth++;
+        }
+      }
+
+      if (container && !cells.includes(container)) {
+        cells.push(container);
+      }
     });
+
+    return cells;
   }
 
   // Create flow container for a video cell

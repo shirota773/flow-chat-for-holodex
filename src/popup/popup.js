@@ -233,16 +233,19 @@ function showMessage(text, type) {
   }, 3000);
 }
 
-// Check if current tab is Holodex multiview
+// Check if current tab is Holodex
 function checkCurrentTab() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].url) {
       if (tabs[0].url.includes('holodex.net/multiview')) {
         elements.status.className = 'status active';
         elements.statusText.textContent = 'Active on Holodex Multiview';
+      } else if (tabs[0].url.includes('holodex.net/watch/')) {
+        elements.status.className = 'status active';
+        elements.statusText.textContent = 'Active on Holodex Watch';
       } else if (tabs[0].url.includes('holodex.net')) {
         elements.status.className = 'status inactive';
-        elements.statusText.textContent = 'Go to Multiview to use';
+        elements.statusText.textContent = 'Go to Multiview or Watch page';
       } else {
         elements.status.className = 'status inactive';
         elements.statusText.textContent = 'Not on Holodex';
