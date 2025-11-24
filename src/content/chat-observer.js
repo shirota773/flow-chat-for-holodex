@@ -4,6 +4,18 @@
 (function() {
   'use strict';
 
+  // Check if this is a background chat iframe created by Flow Chat
+  const urlParams = new URLSearchParams(window.location.search);
+  const isBackgroundChat = urlParams.get('flow_chat_bg') === 'true';
+
+  // Only run in background chat iframes to avoid duplication
+  if (!isBackgroundChat) {
+    console.log('[FlowChat] Not a background chat iframe, skipping initialization');
+    return;
+  }
+
+  console.log('[FlowChat] Background chat iframe detected, initializing observer');
+
   let observer = null;
   let isEnabled = true;
   let processedMessages = new Set();

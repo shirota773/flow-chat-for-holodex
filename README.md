@@ -4,8 +4,10 @@ YouTube Live Chatのコメントを画面上にフロー表示（ニコニコ動
 
 ## 機能
 
+- **バックグラウンドチャット**: Holodex上にチャットウィンドウがなくても、バックグラウンドで自動的にチャットを取得
 - **フロー表示**: ライブチャットメッセージを動画上に流れるように表示
 - **マルチビュー対応**: Holodexの複数動画同時視聴に対応
+- **自動検出**: ページ上の動画を自動的に検出し、各動画のチャットを個別に管理
 - **カスタマイズ可能**:
   - メッセージの速度調整
   - フォントサイズ変更
@@ -74,16 +76,17 @@ manifest.json (Manifest V3)
 
 ### 動作原理
 
-1. **チャット監視**: YouTube Live Chat iframe内でMutationObserverを使用してDOMの変更を監視
-2. **メッセージ転送**: `postMessage` APIを使用してHolodexページにチャットデータを送信
-3. **フロー表示**: CSS Animationを使用してメッセージを横スクロール表示
-4. **レーン管理**: メッセージの重なりを防ぐためのレーンシステム
+1. **動画検出**: Holodexページ上のYouTube動画を自動的に検出（iframeまたはdata-video-id属性から）
+2. **バックグラウンドチャット作成**: 検出した各動画に対して、非表示のYouTube Live Chat iframeをバックグラウンドで自動作成
+3. **チャット監視**: バックグラウンドのiframe内でMutationObserverを使用してDOMの変更を監視
+4. **メッセージ転送**: `postMessage` APIを使用してHolodexページにチャットデータを送信
+5. **フロー表示**: CSS Animationを使用してメッセージを横スクロール表示
+6. **衝突回避**: メッセージの重なりを防ぐための高度な衝突検出アルゴリズム
 
 ### 制限事項
 
-- クロスオリジンの制限により、YouTube Live Chat iframeから直接DOMにアクセスできないため、Content Scriptを両方のページに注入する必要があります
-- アーカイブ動画のチャットリプレイには対応していない可能性があります
 - 大量のチャットが流れる配信では、パフォーマンスに影響が出る可能性があります
+- Holodexが既に表示しているチャットウィンドウは使用せず、独自のバックグラウンドチャットを使用します
 
 ## 設定の保存
 
@@ -134,6 +137,7 @@ MIT License
 
 - **[Holodex](https://holodex.net/)** - VTuber コンテンツのための素晴らしいプラットフォームを提供していただきありがとうございます
 - **[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)** - Anthropic の AI コーディングアシスタント。この拡張機能の設計・実装を全面的に支援していただきました
+- **[extention-holodex-chat-background](https://github.com/shirota773/extention-holodex-chat-background)** - バックグラウンドチャットiframe作成の参考実装を提供していただきました
 - **[youtube-live-chat-flow](https://github.com/tsukumijima/youtube-live-chat-flow)** - ニコニコ動画風チャット表示のインスピレーションを与えていただきました
 
 ### Claude Code による開発
@@ -142,10 +146,13 @@ MIT License
 
 - Chrome Extension Manifest V3 構造の設計
 - クロスオリジン通信（postMessage API）
+- バックグラウンドチャットiframe自動作成機能
+- 動画の自動検出とトラッキング
 - 衝突検出アルゴリズムによるメッセージ配置
 - ユーザータイプ別フィルタリング・色設定
 - RGB カラーピッカーとカラーパレット UI
 - 設定の即時反映機能
+- 重複処理防止のためのiframe識別システム
 
 ## 貢献
 

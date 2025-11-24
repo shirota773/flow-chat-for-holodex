@@ -35,6 +35,8 @@
   let activeMessages = new Map(); // videoId -> array of active message info
   let messageCount = 0;
   let controlsVisible = false;
+  let backgroundChatIframes = new Map(); // videoId -> iframe element
+  let detectedVideos = new Set(); // Track detected video IDs to avoid duplicates
 
   // Load settings from storage
   function loadSettings() {
@@ -380,19 +382,148 @@
     });
   }
 
-  // Initialize flow containers for all visible videos
-  function initializeContainers() {
-    const cells = findVideoCells();
+  // Extract video ID from URL
+  function extractVideoId(url) {
+    if (!url) return null;
 
-    cells.forEach((cell, index) => {
-      const iframe = cell.querySelector('iframe[src*="youtube.com"]');
-      if (iframe) {
-        // Extract video ID from iframe src
-        const match = iframe.src.match(/(?:embed\/|v=)([a-zA-Z0-9_-]{11})/);
-        const videoId = match ? match[1] : `cell-${index}`;
-        createFlowContainer(cell, videoId);
+    let match = url.match(/[?&]v=([^&]+)/);
+    if (match) return match[1];
+
+    match = url.match(/\/embed\/([^?&]+)/);
+    if (match) return match[1];
+
+    match = url.match(/\/watch\/([^?&]+)/);
+    if (match) return match[1];
+
+    return null;
+  }
+
+  // Check if video is live or archived
+  function checkIfVideoIsLive(videoId) {
+    // Check iframe URLs for live indicators
+    const iframes = document.querySelectorAll('iframe[src*="youtube.com"]');
+    for (const iframe of iframes) {
+      const src = iframe.src;
+      if (src.includes(videoId) && src.includes('/live/')) {
+        return true;
+      }
+    }
+
+    // Check data attributes
+    const videoElements = document.querySelectorAll(`[data-video-id="${videoId}"]`);
+    for (const element of videoElements) {
+      const dataStatus = element.getAttribute('data-status');
+      if (dataStatus === 'live' || element.classList.contains('live')) {
+        return true;
+      }
+    }
+
+    // Check for live badges
+    const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="LiveBadge"]');
+    if (liveBadges.length > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Create background chat iframe for a video
+  function createBackgroundChatIframe(videoId) {
+    if (backgroundChatIframes.has(videoId)) {
+      console.log(`[FlowChat] Background iframe already exists for ${videoId}`);
+      return backgroundChatIframes.get(videoId);
+    }
+
+    const baseUrl = window.location.hostname;
+    const isLive = checkIfVideoIsLive(videoId);
+
+    // Try replay URL first (works for both live and archived)
+    // Add special parameter to identify background chat iframes
+    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
+    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = isLive ? liveUrl : replayUrl;
+    iframe.style.display = 'none';
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    iframe.setAttribute('data-flow-chat-bg', 'true');
+    iframe.setAttribute('data-video-id', videoId);
+    iframe.allow = 'autoplay; encrypted-media';
+
+    // Add to a hidden container
+    let hiddenContainer = document.getElementById('flow-chat-hidden-iframes');
+    if (!hiddenContainer) {
+      hiddenContainer = document.createElement('div');
+      hiddenContainer.id = 'flow-chat-hidden-iframes';
+      hiddenContainer.style.display = 'none';
+      document.body.appendChild(hiddenContainer);
+    }
+
+    hiddenContainer.appendChild(iframe);
+    backgroundChatIframes.set(videoId, iframe);
+
+    console.log(`[FlowChat] Created background chat iframe for ${videoId} (${isLive ? 'live' : 'replay'})`);
+
+    // If not live, try switching to live URL after 5 seconds
+    if (!isLive) {
+      setTimeout(() => {
+        if (checkIfVideoIsLive(videoId)) {
+          console.log(`[FlowChat] Switching ${videoId} to live chat`);
+          iframe.src = liveUrl;
+        }
+      }, 5000);
+    }
+
+    return iframe;
+  }
+
+  // Detect and register videos on the page
+  function detectAndRegisterVideos() {
+    // Pattern 1: YouTube embed iframes
+    const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
+    iframes.forEach(iframe => {
+      const videoId = extractVideoId(iframe.src);
+      if (videoId && !detectedVideos.has(videoId)) {
+        detectedVideos.add(videoId);
+        console.log(`[FlowChat] Detected video from iframe: ${videoId}`);
+
+        // Create flow container
+        const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
+        if (cell) {
+          createFlowContainer(cell, videoId);
+        }
+
+        // Create background chat iframe
+        createBackgroundChatIframe(videoId);
       }
     });
+
+    // Pattern 2: Elements with data-video-id attribute
+    const videoElements = document.querySelectorAll('[data-video-id]');
+    videoElements.forEach(element => {
+      const videoId = element.getAttribute('data-video-id');
+      if (videoId && !detectedVideos.has(videoId)) {
+        detectedVideos.add(videoId);
+        console.log(`[FlowChat] Detected video from data-video-id: ${videoId}`);
+
+        // Create flow container
+        const cell = element.closest('.video-cell, [class*="cell"]') || element;
+        if (cell) {
+          createFlowContainer(cell, videoId);
+        }
+
+        // Create background chat iframe
+        createBackgroundChatIframe(videoId);
+      }
+    });
+  }
+
+  // Initialize flow containers for all visible videos
+  function initializeContainers() {
+    detectAndRegisterVideos();
   }
 
   // Create toggle button
@@ -640,8 +771,16 @@
         if (mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check for YouTube iframes
               if (node.querySelector('iframe[src*="youtube.com"]') ||
-                  node.tagName === 'IFRAME') {
+                  node.tagName === 'IFRAME' && node.src?.includes('youtube.com')) {
+                shouldReinitialize = true;
+              }
+              // Check for video ID attributes
+              if (node.hasAttribute && node.hasAttribute('data-video-id')) {
+                shouldReinitialize = true;
+              }
+              if (node.querySelector && node.querySelector('[data-video-id]')) {
                 shouldReinitialize = true;
               }
             }
@@ -650,7 +789,7 @@
       });
 
       if (shouldReinitialize) {
-        setTimeout(initializeContainers, 1000);
+        setTimeout(detectAndRegisterVideos, 1000);
       }
     });
 
@@ -658,6 +797,11 @@
       childList: true,
       subtree: true
     });
+
+    // Also periodically check for new videos
+    setInterval(() => {
+      detectAndRegisterVideos();
+    }, 10000); // Check every 10 seconds
   }
 
   // Initialize extension
