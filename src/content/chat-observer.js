@@ -135,9 +135,44 @@
     }
   }
 
+  // Apply custom styles directly to chat message elements
+  function applyCustomStylesToElement(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+
+    // Hide author name/ID
+    const authorName = element.querySelector('#author-name');
+    if (authorName) {
+      authorName.style.display = 'none';
+    }
+
+    // Hide author photo/avatar
+    const authorPhoto = element.querySelector('#author-photo');
+    if (authorPhoto) {
+      authorPhoto.style.display = 'none';
+    }
+
+    // Hide chat badges
+    const chatBadges = element.querySelector('#chat-badges');
+    if (chatBadges) {
+      chatBadges.style.display = 'none';
+    }
+
+    // Adjust content padding
+    const content = element.querySelector('#content');
+    if (content) {
+      content.style.paddingLeft = '8px';
+    }
+
+    // Add custom class for identification
+    element.classList.add('flow-chat-styled');
+  }
+
   // Process new chat messages
   function processChatMessages(elements) {
     elements.forEach(element => {
+      // Apply custom styles directly to the element
+      applyCustomStylesToElement(element);
+
       const chatData = parseChatMessage(element);
       if (chatData) {
         sendToParent(chatData);
@@ -231,46 +266,10 @@
     }, 'https://holodex.net');
   }
 
-  // Inject custom CSS to hide user IDs and avatars
-  function injectCustomCSS() {
-    const style = document.createElement('style');
-    style.setAttribute('data-flow-chat-style', 'true');
-    style.textContent = `
-      /* Hide author names/IDs in chat */
-      yt-live-chat-text-message-renderer #author-name,
-      yt-live-chat-paid-message-renderer #author-name,
-      yt-live-chat-membership-item-renderer #author-name {
-        display: none !important;
-      }
-
-      /* Hide author photos/avatars */
-      yt-live-chat-text-message-renderer #author-photo,
-      yt-live-chat-paid-message-renderer #author-photo,
-      yt-live-chat-membership-item-renderer #author-photo {
-        display: none !important;
-      }
-
-      /* Hide author badges */
-      yt-live-chat-text-message-renderer #chat-badges,
-      yt-live-chat-paid-message-renderer #chat-badges,
-      yt-live-chat-membership-item-renderer #chat-badges {
-        display: none !important;
-      }
-
-      /* Adjust message layout to compensate for hidden elements */
-      yt-live-chat-text-message-renderer #content,
-      yt-live-chat-paid-message-renderer #content {
-        padding-left: 8px !important;
-      }
-    `;
-    document.head.appendChild(style);
-    console.log('[FlowChat] Custom CSS injected to hide user IDs and avatars');
-  }
-
   // Initialize
   function init() {
     console.log('[FlowChat] Chat observer initializing...');
-    injectCustomCSS();
+    console.log('[FlowChat] Direct style attributes will be applied to chat elements');
     notifyReady();
     initObserver();
   }
