@@ -126,7 +126,7 @@
     overlay.dataset.videoId = videoId;
     overlay.style.display = 'none'; // Initially hidden
 
-    // Create iframe for chat
+    // Create iframe for chat (this will be used for both reading and writing comments)
     const baseUrl = window.location.hostname;
     const isLive = checkIfVideoIsLive(videoId);
     const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}`;
@@ -140,6 +140,9 @@
     iframe.className = 'flow-chat-overlay-iframe';
     iframe.allow = 'autoplay; encrypted-media';
     iframe.setAttribute('data-video-id', videoId);
+
+    // Store iframe reference for message handling
+    backgroundChatIframes.set(videoId, iframe);
 
     overlay.appendChild(iframe);
 
@@ -190,7 +193,18 @@
       }, 300);
     });
 
+    // If not live, try switching to live URL after 5 seconds
+    if (!isLive) {
+      setTimeout(() => {
+        if (checkIfVideoIsLive(videoId)) {
+          console.log(`[FlowChat] Switching ${videoId} to live chat`);
+          iframe.src = liveUrl;
+        }
+      }, 5000);
+    }
+
     console.log(`[FlowChat] ✓ Chat overlay created successfully for ${videoId} (${isLive ? 'live' : 'replay'})`);
+    console.log(`[FlowChat] This iframe will handle both message reading and comment input`);
 
     return overlay;
   }
@@ -531,59 +545,6 @@
     return false;
   }
 
-  // Create background chat iframe for a video
-  function createBackgroundChatIframe(videoId) {
-    if (backgroundChatIframes.has(videoId)) {
-      console.log(`[FlowChat] Background iframe already exists for ${videoId}`);
-      return backgroundChatIframes.get(videoId);
-    }
-
-    const baseUrl = window.location.hostname;
-    const isLive = checkIfVideoIsLive(videoId);
-
-    // Try replay URL first (works for both live and archived)
-    // Add special parameter to identify background chat iframes
-    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-
-    const iframe = document.createElement('iframe');
-    iframe.src = isLive ? liveUrl : replayUrl;
-    iframe.style.display = 'none';
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    iframe.setAttribute('data-flow-chat-bg', 'true');
-    iframe.setAttribute('data-video-id', videoId);
-    iframe.allow = 'autoplay; encrypted-media';
-
-    // Add to a hidden container
-    let hiddenContainer = document.getElementById('flow-chat-hidden-iframes');
-    if (!hiddenContainer) {
-      hiddenContainer = document.createElement('div');
-      hiddenContainer.id = 'flow-chat-hidden-iframes';
-      hiddenContainer.style.display = 'none';
-      document.body.appendChild(hiddenContainer);
-    }
-
-    hiddenContainer.appendChild(iframe);
-    backgroundChatIframes.set(videoId, iframe);
-
-    console.log(`[FlowChat] Created background chat iframe for ${videoId} (${isLive ? 'live' : 'replay'})`);
-
-    // If not live, try switching to live URL after 5 seconds
-    if (!isLive) {
-      setTimeout(() => {
-        if (checkIfVideoIsLive(videoId)) {
-          console.log(`[FlowChat] Switching ${videoId} to live chat`);
-          iframe.src = liveUrl;
-        }
-      }, 5000);
-    }
-
-    return iframe;
-  }
-
   // Detect and register videos on the page
   function detectAndRegisterVideos() {
     console.log('[FlowChat] === detectAndRegisterVideos called ===');
@@ -610,15 +571,11 @@
           createFlowContainer(cell, videoId);
 
           console.log(`[FlowChat] Creating chat overlay for ${videoId}...`);
-          // Create chat overlay for hover interaction
+          // Create chat overlay (this single iframe handles both reading and writing)
           createChatOverlay(videoId, cell);
         } else {
           console.warn(`[FlowChat] ✗ No video cell found for iframe with videoId ${videoId}`);
         }
-
-        // Create background chat iframe
-        console.log(`[FlowChat] Creating background chat iframe for ${videoId}...`);
-        createBackgroundChatIframe(videoId);
       } else if (videoId) {
         console.log(`[FlowChat] Video ${videoId} already detected, skipping`);
       } else {
@@ -647,15 +604,11 @@
           createFlowContainer(cell, videoId);
 
           console.log(`[FlowChat] Creating chat overlay for ${videoId}...`);
-          // Create chat overlay for hover interaction
+          // Create chat overlay (this single iframe handles both reading and writing)
           createChatOverlay(videoId, cell);
         } else {
           console.warn(`[FlowChat] ✗ No video cell found for element with videoId ${videoId}`);
         }
-
-        // Create background chat iframe
-        console.log(`[FlowChat] Creating background chat iframe for ${videoId}...`);
-        createBackgroundChatIframe(videoId);
       } else if (videoId) {
         console.log(`[FlowChat] Video ${videoId} already detected, skipping`);
       }
