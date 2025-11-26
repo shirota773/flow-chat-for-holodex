@@ -139,8 +139,10 @@
     const iframe = document.createElement('iframe');
     iframe.src = isLive ? liveUrl : replayUrl;
     iframe.className = 'flow-chat-overlay-iframe';
+    iframe.classList.add('flow-chat-custom'); // Add custom class for easy styling
     iframe.allow = 'autoplay; encrypted-media';
     iframe.setAttribute('data-video-id', videoId);
+    iframe.setAttribute('data-flow-chat', 'true'); // Mark as flow chat iframe
 
     // Store iframe reference for message handling
     backgroundChatIframes.set(videoId, iframe);
