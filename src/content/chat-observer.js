@@ -135,43 +135,93 @@
     }
   }
 
-  // Apply custom styles directly to chat message elements
-  function applyCustomStylesToElement(element) {
+  // Apply custom classes to chat message elements
+  function applyCustomClassesToElement(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
-    // Hide author name/ID
+    // Add custom class to the message element itself
+    element.classList.add('flow-chat-message');
+
+    // Add custom classes to child elements
     const authorName = element.querySelector('#author-name');
     if (authorName) {
-      authorName.style.display = 'none';
+      authorName.classList.add('flow-chat-author-name');
     }
 
-    // Hide author photo/avatar
     const authorPhoto = element.querySelector('#author-photo');
     if (authorPhoto) {
-      authorPhoto.style.display = 'none';
+      authorPhoto.classList.add('flow-chat-author-photo');
     }
 
-    // Hide chat badges
     const chatBadges = element.querySelector('#chat-badges');
     if (chatBadges) {
-      chatBadges.style.display = 'none';
+      chatBadges.classList.add('flow-chat-badges');
     }
 
-    // Adjust content padding
     const content = element.querySelector('#content');
     if (content) {
-      content.style.paddingLeft = '8px';
+      content.classList.add('flow-chat-content');
     }
 
-    // Add custom class for identification
-    element.classList.add('flow-chat-styled');
+    const message = element.querySelector('#message');
+    if (message) {
+      message.classList.add('flow-chat-message-text');
+    }
+  }
+
+  // Inject custom CSS styles into iframe
+  function injectCustomStyles() {
+    // Check if style already exists
+    if (document.querySelector('#flow-chat-custom-styles')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'flow-chat-custom-styles';
+    style.textContent = `
+      /* Flow Chat Custom Styles */
+      /* You can customize these styles as needed */
+
+      /* Hide author names/IDs */
+      .flow-chat-author-name {
+        display: none !important;
+      }
+
+      /* Hide author photos/avatars */
+      .flow-chat-author-photo {
+        display: none !important;
+      }
+
+      /* Hide chat badges */
+      .flow-chat-badges {
+        display: none !important;
+      }
+
+      /* Adjust content padding */
+      .flow-chat-content {
+        padding-left: 8px !important;
+      }
+
+      /* Additional styling for message containers */
+      .flow-chat-message {
+        /* Add custom styles here if needed */
+      }
+
+      /* Additional styling for message text */
+      .flow-chat-message-text {
+        /* Add custom styles here if needed */
+      }
+    `;
+
+    document.head.appendChild(style);
+    console.log('[FlowChat] Custom style element injected with ID: flow-chat-custom-styles');
   }
 
   // Process new chat messages
   function processChatMessages(elements) {
     elements.forEach(element => {
-      // Apply custom styles directly to the element
-      applyCustomStylesToElement(element);
+      // Apply custom classes to the element
+      applyCustomClassesToElement(element);
 
       const chatData = parseChatMessage(element);
       if (chatData) {
@@ -269,7 +319,11 @@
   // Initialize
   function init() {
     console.log('[FlowChat] Chat observer initializing...');
-    console.log('[FlowChat] Direct style attributes will be applied to chat elements');
+    console.log('[FlowChat] Custom classes and styles will be applied to chat elements');
+
+    // Inject custom styles
+    injectCustomStyles();
+
     notifyReady();
     initObserver();
   }
