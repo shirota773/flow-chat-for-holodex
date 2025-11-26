@@ -156,6 +156,8 @@
     console.log(`[FlowChat] Overlay position:`, window.getComputedStyle(overlay).position);
 
     // Add hover listeners to video cell
+    // Show overlay when cursor enters video cell, hide when cursor leaves video cell
+    // This ensures the overlay stays visible while cursor is anywhere on the video
     let hideTimeout = null;
 
     videoCell.addEventListener('mouseenter', () => {
@@ -170,24 +172,7 @@
 
     videoCell.addEventListener('mouseleave', () => {
       console.log(`[FlowChat] Mouse left video cell for ${videoId}`);
-      // Add small delay before hiding to allow moving cursor to chat
-      hideTimeout = setTimeout(() => {
-        overlay.style.display = 'none';
-        console.log(`[FlowChat] Overlay hidden for ${videoId}`);
-      }, 300);
-    });
-
-    // Keep overlay visible when hovering over it
-    overlay.addEventListener('mouseenter', () => {
-      console.log(`[FlowChat] Mouse entered overlay for ${videoId}`);
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-    });
-
-    overlay.addEventListener('mouseleave', () => {
-      console.log(`[FlowChat] Mouse left overlay for ${videoId}`);
+      // Add small delay before hiding
       hideTimeout = setTimeout(() => {
         overlay.style.display = 'none';
         console.log(`[FlowChat] Overlay hidden for ${videoId}`);
