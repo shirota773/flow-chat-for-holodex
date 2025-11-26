@@ -212,7 +212,9 @@
         case 'ping':
           window.parent.postMessage({
             type: 'FLOW_CHAT_PONG',
-            videoId: getVideoId()
+            data: {
+              videoId: getVideoId()
+            }
           }, 'https://holodex.net');
           break;
       }
@@ -223,7 +225,9 @@
   function notifyReady() {
     window.parent.postMessage({
       type: 'FLOW_CHAT_READY',
-      videoId: getVideoId()
+      data: {
+        videoId: getVideoId()
+      }
     }, 'https://holodex.net');
   }
 
