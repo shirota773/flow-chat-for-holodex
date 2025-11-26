@@ -37,6 +37,8 @@
   let controlsVisible = false;
   let backgroundChatIframes = new Map(); // videoId -> iframe element
   let detectedVideos = new Set(); // Track detected video IDs to avoid duplicates
+  let chatOverlays = new Map(); // videoId -> chat overlay element
+  let videoCells = new Map(); // videoId -> video cell element
 
   // Load settings from storage
   function loadSettings() {
@@ -94,8 +96,73 @@
     videoCell.appendChild(container);
     flowContainers.set(videoId, container);
     activeMessages.set(videoId, []);
+    videoCells.set(videoId, videoCell);
 
     return container;
+  }
+
+  // Create chat overlay for video hover
+  function createChatOverlay(videoId, videoCell) {
+    if (chatOverlays.has(videoId)) {
+      return chatOverlays.get(videoId);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'flow-chat-overlay';
+    overlay.dataset.videoId = videoId;
+    overlay.style.display = 'none'; // Initially hidden
+
+    // Create iframe for chat
+    const baseUrl = window.location.hostname;
+    const isLive = checkIfVideoIsLive(videoId);
+    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}`;
+    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}`;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = isLive ? liveUrl : replayUrl;
+    iframe.className = 'flow-chat-overlay-iframe';
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.setAttribute('data-video-id', videoId);
+
+    overlay.appendChild(iframe);
+    videoCell.appendChild(overlay);
+    chatOverlays.set(videoId, overlay);
+
+    // Add hover listeners to video cell
+    let hideTimeout = null;
+
+    videoCell.addEventListener('mouseenter', () => {
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
+      }
+      overlay.style.display = 'block';
+    });
+
+    videoCell.addEventListener('mouseleave', () => {
+      // Add small delay before hiding to allow moving cursor to chat
+      hideTimeout = setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 300);
+    });
+
+    // Keep overlay visible when hovering over it
+    overlay.addEventListener('mouseenter', () => {
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
+      }
+    });
+
+    overlay.addEventListener('mouseleave', () => {
+      hideTimeout = setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 300);
+    });
+
+    console.log(`[FlowChat] Created chat overlay for ${videoId} (${isLive ? 'live' : 'replay'})`);
+
+    return overlay;
   }
 
   // Check if two messages would collide
@@ -494,6 +561,8 @@
         const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
         if (cell) {
           createFlowContainer(cell, videoId);
+          // Create chat overlay for hover interaction
+          createChatOverlay(videoId, cell);
         }
 
         // Create background chat iframe
@@ -513,6 +582,8 @@
         const cell = element.closest('.video-cell, [class*="cell"]') || element;
         if (cell) {
           createFlowContainer(cell, videoId);
+          // Create chat overlay for hover interaction
+          createChatOverlay(videoId, cell);
         }
 
         // Create background chat iframe
