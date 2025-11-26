@@ -129,8 +129,9 @@
     // Create iframe for chat (this will be used for both reading and writing comments)
     const baseUrl = window.location.hostname;
     const isLive = checkIfVideoIsLive(videoId);
-    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}`;
-    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}`;
+    // Add flow_chat_bg=true parameter so chat-observer.js can detect and monitor this iframe
+    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
+    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
 
     console.log(`[FlowChat] Video ${videoId} is ${isLive ? 'LIVE' : 'REPLAY'}`);
     console.log(`[FlowChat] Chat URL: ${isLive ? liveUrl : replayUrl}`);
