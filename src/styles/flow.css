@@ -184,8 +184,9 @@
   top: 0;
   left: 0;
   width: 350px;
-  height: 500px;
-  background: rgba(0, 0, 0, 0.9);
+  /*   height: 500px; */
+  height: fit-contents;
+  background: rgba(0, 0, 0, 0);
   border-radius: 0 8px 0 0;
   z-index: 10000;
   pointer-events: auto;
@@ -196,7 +197,30 @@
 
 .flow-chat-overlay-iframe {
   width: 100%;
-  height: 100%;
+  /*   height: 100%; */
+  height: fit-contents;
   border: none;
   border-radius: 0 8px 0 0;
+}
+
+tp-yt-iron-pages#panel-pages {
+  height: fit-contents;
+  left: 0 !important;
+}
+
+yt-live-chat-app {
+  height: initial;
+}
+
+
+dom-if,
+#contents > #chat,
+#chat-messages > yt-live-chat-header-renderer,
+yt-reaction-control-panel-overlay-view-model,
+#search-panel,
+#category-buttons,
+yt-formatted-string#title,
+tp-yt-iron-dropdown,
+yt-live-chat-header-renderer[role="heading"] {
+  display:none !important;
 }

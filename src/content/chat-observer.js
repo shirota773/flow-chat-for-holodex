@@ -182,6 +182,46 @@
       /* Flow Chat Custom Styles */
       /* You can customize these styles as needed */
 
+      /* Hide */
+      yt-live-chat-header-renderer[role="heading"],
+      #contents > #chat,
+      #contents > #ticker,
+      #category-buttons,
+      dom-if,
+      tp-yt-iron-dropdown,
+yt-reaction-control-panel-overlay-view-model,
+yt-formatted-string#title,
+#search-panel,
+yt-img-shadow#avatar {
+        display:none !important;
+      }
+
+#content-pages img {
+    height: 18px;
+    width:  18px;
+}
+
+panel-pages {
+height: fit-contents !important;
+}
+
+* {
+--yt-live-chat-background-color: black;
+--yt-live-chat-primary-text-color: white;
+}
+
+yt-emoji-picker-renderer#emoji {
+margin-top: 0;
+}
+
+#categories-wrapper yt-emoji-picker-category-renderer {
+  margin-left:12px;
+}
+
+yt-live-chat-message-input-renderer {
+padding-left: 10px;
+}
+
       /* Hide author names/IDs */
       .flow-chat-author-name {
         display: none !important;
