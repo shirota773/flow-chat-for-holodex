@@ -10,11 +10,8 @@
 
   // Only run in background chat iframes to avoid duplication
   if (!isBackgroundChat) {
-    console.log('[FlowChat] Not a background chat iframe, skipping initialization');
     return;
   }
-
-  console.log('[FlowChat] Background chat iframe detected, initializing observer');
 
   let observer = null;
   let isEnabled = true;
@@ -131,7 +128,7 @@
         data: chatData
       }, 'https://holodex.net');
     } catch (e) {
-      console.error('[FlowChat] Failed to send message:', e);
+      // Silently fail
     }
   }
 
@@ -254,7 +251,6 @@ padding-left: 10px;
     `;
 
     document.head.appendChild(style);
-    console.log('[FlowChat] Custom style element injected with ID: flow-chat-custom-styles');
   }
 
   // Process new chat messages
@@ -280,8 +276,6 @@ padding-left: 10px;
       setTimeout(initObserver, 1000);
       return;
     }
-
-    console.log('[FlowChat] Chat container found, starting observer');
 
     observer = new MutationObserver((mutations) => {
       const newMessages = [];
@@ -328,11 +322,9 @@ padding-left: 10px;
       switch (event.data.action) {
         case 'enable':
           isEnabled = true;
-          console.log('[FlowChat] Chat observer enabled');
           break;
         case 'disable':
           isEnabled = false;
-          console.log('[FlowChat] Chat observer disabled');
           break;
         case 'ping':
           window.parent.postMessage({
@@ -358,9 +350,6 @@ padding-left: 10px;
 
   // Initialize
   function init() {
-    console.log('[FlowChat] Chat observer initializing...');
-    console.log('[FlowChat] Custom classes and styles will be applied to chat elements');
-
     // Inject custom styles
     injectCustomStyles();
 

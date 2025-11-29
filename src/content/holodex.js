@@ -56,7 +56,6 @@
     if (areaName === 'sync' && changes.flowChatSettings) {
       settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
       updateControlPanelUI();
-      console.log('[FlowChat] Settings updated:', settings);
     }
   });
 
@@ -79,14 +78,9 @@
 
   // Create flow container for a video cell
   function createFlowContainer(videoCell, videoId) {
-    console.log(`[FlowChat] createFlowContainer called for videoId: ${videoId}`, videoCell);
-
     if (flowContainers.has(videoId)) {
-      console.log(`[FlowChat] Flow container already exists for ${videoId}`);
       return flowContainers.get(videoId);
     }
-
-    console.log(`[FlowChat] Creating new flow container for ${videoId}`);
 
     const container = document.createElement('div');
     container.className = 'flow-chat-container';
@@ -94,10 +88,8 @@
 
     // Ensure video cell has relative positioning
     const computedStyle = window.getComputedStyle(videoCell);
-    console.log(`[FlowChat] Video cell position: ${computedStyle.position}`);
     if (computedStyle.position === 'static') {
       videoCell.style.position = 'relative';
-      console.log(`[FlowChat] Changed video cell position to relative`);
     }
 
     videoCell.appendChild(container);
@@ -105,21 +97,14 @@
     activeMessages.set(videoId, []);
     videoCells.set(videoId, videoCell);
 
-    console.log(`[FlowChat] ✓ Flow container created successfully for ${videoId}`);
-
     return container;
   }
 
   // Create chat overlay for video hover
   function createChatOverlay(videoId, videoCell) {
-    console.log(`[FlowChat] createChatOverlay called for videoId: ${videoId}`, videoCell);
-
     if (chatOverlays.has(videoId)) {
-      console.log(`[FlowChat] Chat overlay already exists for ${videoId}`);
       return chatOverlays.get(videoId);
     }
-
-    console.log(`[FlowChat] Creating new chat overlay for ${videoId}`);
 
     const overlay = document.createElement('div');
     overlay.className = 'flow-chat-overlay';
@@ -133,9 +118,6 @@
     const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
     const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
 
-    console.log(`[FlowChat] Video ${videoId} is ${isLive ? 'LIVE' : 'REPLAY'}`);
-    console.log(`[FlowChat] Chat URL: ${isLive ? liveUrl : replayUrl}`);
-
     const iframe = document.createElement('iframe');
     iframe.src = isLive ? liveUrl : replayUrl;
     iframe.className = 'flow-chat-overlay-iframe';
@@ -146,14 +128,8 @@
     backgroundChatIframes.set(videoId, iframe);
 
     overlay.appendChild(iframe);
-
-    console.log(`[FlowChat] Appending overlay to video cell:`, videoCell);
     videoCell.appendChild(overlay);
     chatOverlays.set(videoId, overlay);
-
-    console.log(`[FlowChat] Overlay element:`, overlay);
-    console.log(`[FlowChat] Overlay dimensions: ${overlay.offsetWidth}x${overlay.offsetHeight}`);
-    console.log(`[FlowChat] Overlay position:`, window.getComputedStyle(overlay).position);
 
     // Add hover listeners to video cell
     // Show overlay when cursor enters video cell, hide when cursor leaves video cell
@@ -161,21 +137,17 @@
     let hideTimeout = null;
 
     videoCell.addEventListener('mouseenter', () => {
-      console.log(`[FlowChat] Mouse entered video cell for ${videoId}`);
       if (hideTimeout) {
         clearTimeout(hideTimeout);
         hideTimeout = null;
       }
       overlay.style.display = 'block';
-      console.log(`[FlowChat] Overlay display set to block for ${videoId}`);
     });
 
     videoCell.addEventListener('mouseleave', () => {
-      console.log(`[FlowChat] Mouse left video cell for ${videoId}`);
       // Add small delay before hiding
       hideTimeout = setTimeout(() => {
         overlay.style.display = 'none';
-        console.log(`[FlowChat] Overlay hidden for ${videoId}`);
       }, 300);
     });
 
@@ -183,14 +155,10 @@
     if (!isLive) {
       setTimeout(() => {
         if (checkIfVideoIsLive(videoId)) {
-          console.log(`[FlowChat] Switching ${videoId} to live chat`);
           iframe.src = liveUrl;
         }
       }, 5000);
     }
-
-    console.log(`[FlowChat] ✓ Chat overlay created successfully for ${videoId} (${isLive ? 'live' : 'replay'})`);
-    console.log(`[FlowChat] This iframe will handle both message reading and comment input`);
 
     return overlay;
   }
@@ -452,19 +420,13 @@
   function handleChatMessage(event) {
     if (event.origin !== 'https://www.youtube.com') return;
 
-    console.log('[FlowChat] Received message from YouTube:', event.data);
-
     const { type, data } = event.data;
 
     if (type === 'FLOW_CHAT_MESSAGE' && data) {
-      console.log('[FlowChat] Processing chat message:', data);
       createFlowMessage(data);
     } else if (type === 'FLOW_CHAT_READY') {
       if (data && data.videoId) {
-        console.log('[FlowChat] Chat observer ready for video:', data.videoId);
         setupVideoCell(data.videoId);
-      } else {
-        console.warn('[FlowChat] FLOW_CHAT_READY received but data or videoId is missing:', data);
       }
     }
   }
@@ -533,76 +495,45 @@
 
   // Detect and register videos on the page
   function detectAndRegisterVideos() {
-    console.log('[FlowChat] === detectAndRegisterVideos called ===');
-
     // Pattern 1: YouTube embed iframes
     const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
-    console.log(`[FlowChat] Found ${iframes.length} YouTube embed iframes`);
 
-    iframes.forEach((iframe, index) => {
-      console.log(`[FlowChat] Processing iframe ${index + 1}/${iframes.length}:`, iframe.src);
+    iframes.forEach((iframe) => {
       const videoId = extractVideoId(iframe.src);
-      console.log(`[FlowChat] Extracted videoId: ${videoId}`);
 
       if (videoId && !detectedVideos.has(videoId)) {
         detectedVideos.add(videoId);
-        console.log(`[FlowChat] ✓ Detected NEW video from iframe: ${videoId}`);
 
         // Create flow container
         const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
-        console.log(`[FlowChat] Found video cell:`, cell);
 
         if (cell) {
-          console.log(`[FlowChat] Creating flow container for ${videoId}...`);
           createFlowContainer(cell, videoId);
-
-          console.log(`[FlowChat] Creating chat overlay for ${videoId}...`);
           // Create chat overlay (this single iframe handles both reading and writing)
           createChatOverlay(videoId, cell);
-        } else {
-          console.warn(`[FlowChat] ✗ No video cell found for iframe with videoId ${videoId}`);
         }
-      } else if (videoId) {
-        console.log(`[FlowChat] Video ${videoId} already detected, skipping`);
-      } else {
-        console.warn(`[FlowChat] Could not extract videoId from iframe src: ${iframe.src}`);
       }
     });
 
     // Pattern 2: Elements with data-video-id attribute
     const videoElements = document.querySelectorAll('[data-video-id]');
-    console.log(`[FlowChat] Found ${videoElements.length} elements with data-video-id`);
 
-    videoElements.forEach((element, index) => {
+    videoElements.forEach((element) => {
       const videoId = element.getAttribute('data-video-id');
-      console.log(`[FlowChat] Processing element ${index + 1}/${videoElements.length} with data-video-id: ${videoId}`);
 
       if (videoId && !detectedVideos.has(videoId)) {
         detectedVideos.add(videoId);
-        console.log(`[FlowChat] ✓ Detected NEW video from data-video-id: ${videoId}`);
 
         // Create flow container
         const cell = element.closest('.video-cell, [class*="cell"]') || element;
-        console.log(`[FlowChat] Found video cell:`, cell);
 
         if (cell) {
-          console.log(`[FlowChat] Creating flow container for ${videoId}...`);
           createFlowContainer(cell, videoId);
-
-          console.log(`[FlowChat] Creating chat overlay for ${videoId}...`);
           // Create chat overlay (this single iframe handles both reading and writing)
           createChatOverlay(videoId, cell);
-        } else {
-          console.warn(`[FlowChat] ✗ No video cell found for element with videoId ${videoId}`);
         }
-      } else if (videoId) {
-        console.log(`[FlowChat] Video ${videoId} already detected, skipping`);
       }
     });
-
-    console.log('[FlowChat] === detectAndRegisterVideos completed ===');
-    console.log(`[FlowChat] Total detected videos: ${detectedVideos.size}`);
-    console.log(`[FlowChat] Detected video IDs:`, Array.from(detectedVideos));
   }
 
   // Initialize flow containers for all visible videos
@@ -636,7 +567,10 @@
     panel.style.display = 'none';
 
     panel.innerHTML = `
-      <h3>Flow Chat Settings</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="margin: 0;">Flow Chat Settings</h3>
+        <button id="flow-close-btn" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">&times;</button>
+      </div>
 
       <label>
         <span>Enable</span>
@@ -719,6 +653,11 @@
     document.body.appendChild(panel);
 
     // Event listeners
+    // Close button
+    panel.querySelector('#flow-close-btn').addEventListener('click', () => {
+      hideControls();
+    });
+
     panel.querySelector('#flow-enabled').addEventListener('change', (e) => {
       settings.enabled = e.target.checked;
       saveSettings();
@@ -789,7 +728,7 @@
 
     panel.querySelector('#flow-save').addEventListener('click', () => {
       saveSettings();
-      alert('Settings saved!');
+      hideControls();
     });
   }
 
@@ -918,8 +857,6 @@
 
   // Initialize extension
   function init() {
-    console.log('[FlowChat] Initializing Flow Chat for Holodex');
-
     loadSettings();
     createToggleButton();
     createControlPanel();
@@ -935,8 +872,6 @@
       initializeContainers();
       watchForNewCells();
     }, 2000);
-
-    console.log('[FlowChat] Flow Chat initialized');
   }
 
   // Start when page is ready
