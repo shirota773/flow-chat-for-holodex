@@ -10,7 +10,7 @@
     displayTime: 8,  // seconds to display on screen
     fontSize: 28,    // pixels
     opacity: 1.0,
-    maxMessages: 50, // max simultaneous messages
+    maxMessages: 100, // max simultaneous messages (increased from 50)
     displayArea: 1.0, // percentage of screen height to use (0.0-1.0)
     minVerticalGap: 4, // minimum pixels between messages vertically
     // Show/hide comments per user type
@@ -659,6 +659,11 @@
       </label>
 
       <label>
+        <span>Max Messages (${settings.maxMessages})</span>
+        <input type="range" id="flow-max-messages" min="20" max="200" step="10" value="${settings.maxMessages}">
+      </label>
+
+      <label>
         <span>Display Area (${Math.round(settings.displayArea * 100)}%)</span>
         <input type="range" id="flow-display-area" min="0.3" max="1" step="0.1" value="${settings.displayArea}">
       </label>
@@ -733,6 +738,11 @@
       settings.opacity = parseFloat(e.target.value);
     });
 
+    panel.querySelector('#flow-max-messages').addEventListener('input', (e) => {
+      settings.maxMessages = parseInt(e.target.value);
+      e.target.previousElementSibling.textContent = `Max Messages (${settings.maxMessages})`;
+    });
+
     panel.querySelector('#flow-display-area').addEventListener('input', (e) => {
       settings.displayArea = parseFloat(e.target.value);
       e.target.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
@@ -792,6 +802,7 @@
     const displayTimeEl = panel.querySelector('#flow-display-time');
     const fontSizeEl = panel.querySelector('#flow-font-size');
     const opacityEl = panel.querySelector('#flow-opacity');
+    const maxMessagesEl = panel.querySelector('#flow-max-messages');
     const displayAreaEl = panel.querySelector('#flow-display-area');
     const showOwnerEl = panel.querySelector('#flow-show-owner');
     const showModeratorEl = panel.querySelector('#flow-show-moderator');
@@ -812,6 +823,10 @@
       fontSizeEl.previousElementSibling.textContent = `Size (${settings.fontSize}px)`;
     }
     if (opacityEl) opacityEl.value = settings.opacity;
+    if (maxMessagesEl) {
+      maxMessagesEl.value = settings.maxMessages;
+      maxMessagesEl.previousElementSibling.textContent = `Max Messages (${settings.maxMessages})`;
+    }
     if (displayAreaEl) {
       displayAreaEl.value = settings.displayArea;
       displayAreaEl.previousElementSibling.textContent = `Display Area (${Math.round(settings.displayArea * 100)}%)`;
@@ -839,6 +854,19 @@
     if (panel) {
       panel.style.display = 'none';
       controlsVisible = false;
+    }
+  }
+
+  // Close panel when clicking outside
+  function handleOutsideClick(event) {
+    const panel = document.getElementById('flow-chat-controls');
+    const toggle = document.querySelector('.flow-chat-toggle');
+
+    if (controlsVisible && panel && toggle) {
+      // Check if click is outside both panel and toggle button
+      if (!panel.contains(event.target) && !toggle.contains(event.target)) {
+        hideControls();
+      }
     }
   }
 
@@ -898,6 +926,9 @@
 
     // Listen for messages from chat iframes
     window.addEventListener('message', handleChatMessage);
+
+    // Listen for clicks outside the control panel to close it
+    document.addEventListener('click', handleOutsideClick);
 
     // Initial setup
     setTimeout(() => {

@@ -5,7 +5,7 @@ const defaultSettings = {
   displayTime: 8,
   fontSize: 28,
   opacity: 1.0,
-  maxMessages: 50,
+  maxMessages: 100, // increased from 50
   displayArea: 1.0,
   minVerticalGap: 4,
   showOwner: true,
@@ -100,6 +100,8 @@ const elements = {
   fontSizeValue: document.getElementById('fontSize-value'),
   opacity: document.getElementById('opacity'),
   opacityValue: document.getElementById('opacity-value'),
+  maxMessages: document.getElementById('maxMessages'),
+  maxMessagesValue: document.getElementById('maxMessages-value'),
   displayArea: document.getElementById('displayArea'),
   displayAreaValue: document.getElementById('displayArea-value'),
   showOwner: document.getElementById('showOwner'),
@@ -156,6 +158,8 @@ function updateUI() {
   elements.fontSizeValue.textContent = `${currentSettings.fontSize}px`;
   elements.opacity.value = currentSettings.opacity;
   elements.opacityValue.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
+  elements.maxMessages.value = currentSettings.maxMessages;
+  elements.maxMessagesValue.textContent = `${currentSettings.maxMessages}`;
   elements.displayArea.value = currentSettings.displayArea;
   elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
   elements.showOwner.checked = currentSettings.showOwner;
@@ -181,7 +185,7 @@ function saveSettings() {
     displayTime: parseInt(elements.displayTime.value),
     fontSize: parseInt(elements.fontSize.value),
     opacity: parseFloat(elements.opacity.value),
-    maxMessages: currentSettings.maxMessages,
+    maxMessages: parseInt(elements.maxMessages.value),
     displayArea: parseFloat(elements.displayArea.value),
     minVerticalGap: currentSettings.minVerticalGap,
     showOwner: elements.showOwner.checked,
@@ -357,6 +361,10 @@ elements.fontSize.addEventListener('input', (e) => {
 
 elements.opacity.addEventListener('input', (e) => {
   elements.opacityValue.textContent = `${Math.round(e.target.value * 100)}%`;
+});
+
+elements.maxMessages.addEventListener('input', (e) => {
+  elements.maxMessagesValue.textContent = `${e.target.value}`;
 });
 
 elements.displayArea.addEventListener('input', (e) => {
