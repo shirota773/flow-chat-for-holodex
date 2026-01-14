@@ -39,6 +39,7 @@
   let detectedVideos = new Set(); // Track detected video IDs to avoid duplicates
   let chatOverlays = new Map(); // videoId -> chat overlay element
   let videoCells = new Map(); // videoId -> video cell element
+  let flowEnabledPerVideo = new Map(); // videoId -> boolean (per-video flow chat enabled state)
 
   // Load settings from storage
   function loadSettings() {
@@ -100,18 +101,24 @@
     return container;
   }
 
-  // Create chat overlay for video hover
-  function createChatOverlay(videoId, videoCell) {
-    if (chatOverlays.has(videoId)) {
-      return chatOverlays.get(videoId);
+  // Create background chat iframe for fetching messages (hidden, no hover display)
+  function createBackgroundChatIframe(videoId, videoCell) {
+    if (backgroundChatIframes.has(videoId)) {
+      return backgroundChatIframes.get(videoId);
     }
 
-    const overlay = document.createElement('div');
-    overlay.className = 'flow-chat-overlay';
-    overlay.dataset.videoId = videoId;
-    overlay.style.display = 'none'; // Initially hidden
+    // Initialize per-video flow enabled state (default: enabled)
+    if (!flowEnabledPerVideo.has(videoId)) {
+      flowEnabledPerVideo.set(videoId, true);
+    }
 
-    // Create iframe for chat (this will be used for both reading and writing comments)
+    // Create hidden container for background chat iframe
+    const container = document.createElement('div');
+    container.className = 'flow-chat-bg-container';
+    container.dataset.videoId = videoId;
+    container.style.display = 'none'; // Always hidden
+
+    // Create iframe for chat (background only, for reading messages)
     const baseUrl = window.location.hostname;
     const isLive = checkIfVideoIsLive(videoId);
     // Add flow_chat_bg=true parameter so chat-observer.js can detect and monitor this iframe
@@ -120,36 +127,15 @@
 
     const iframe = document.createElement('iframe');
     iframe.src = isLive ? liveUrl : replayUrl;
-    iframe.className = 'flow-chat-overlay-iframe';
+    iframe.className = 'flow-chat-bg-iframe';
     iframe.allow = 'autoplay; encrypted-media';
     iframe.setAttribute('data-video-id', videoId);
 
     // Store iframe reference for message handling
     backgroundChatIframes.set(videoId, iframe);
 
-    overlay.appendChild(iframe);
-    videoCell.appendChild(overlay);
-    chatOverlays.set(videoId, overlay);
-
-    // Add hover listeners to video cell
-    // Show overlay when cursor enters video cell, hide when cursor leaves video cell
-    // This ensures the overlay stays visible while cursor is anywhere on the video
-    let hideTimeout = null;
-
-    videoCell.addEventListener('mouseenter', () => {
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-      overlay.style.display = 'block';
-    });
-
-    videoCell.addEventListener('mouseleave', () => {
-      // Add small delay before hiding
-      hideTimeout = setTimeout(() => {
-        overlay.style.display = 'none';
-      }, 300);
-    });
+    container.appendChild(iframe);
+    videoCell.appendChild(container);
 
     // If not live, try switching to live URL after 5 seconds
     if (!isLive) {
@@ -160,7 +146,50 @@
       }, 5000);
     }
 
-    return overlay;
+    // Create per-video toggle button
+    createPerVideoToggle(videoId, videoCell);
+
+    return iframe;
+  }
+
+  // Create per-video flow chat toggle button
+  function createPerVideoToggle(videoId, videoCell) {
+    const toggle = document.createElement('button');
+    toggle.className = 'flow-chat-video-toggle';
+    toggle.dataset.videoId = videoId;
+    toggle.title = 'Toggle Flow Chat';
+
+    // Set initial state
+    const isEnabled = flowEnabledPerVideo.get(videoId) !== false;
+    toggle.innerHTML = isEnabled ? '💬' : '🚫';
+    toggle.classList.toggle('disabled', !isEnabled);
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const currentState = flowEnabledPerVideo.get(videoId) !== false;
+      const newState = !currentState;
+      flowEnabledPerVideo.set(videoId, newState);
+
+      toggle.innerHTML = newState ? '💬' : '🚫';
+      toggle.classList.toggle('disabled', !newState);
+
+      // Show/hide flow container based on state
+      const container = flowContainers.get(videoId);
+      if (container) {
+        container.style.display = newState ? 'block' : 'none';
+      }
+    });
+
+    // Add hover listeners to video cell for showing/hiding toggle button
+    videoCell.addEventListener('mouseenter', () => {
+      toggle.classList.add('visible');
+    });
+
+    videoCell.addEventListener('mouseleave', () => {
+      toggle.classList.remove('visible');
+    });
+
+    videoCell.appendChild(toggle);
   }
 
   // Check if two messages would collide
@@ -248,6 +277,9 @@
   function createFlowMessage(chatData) {
     const container = flowContainers.get(chatData.videoId);
     if (!container || !settings.enabled) return;
+
+    // Check per-video flow enabled state
+    if (flowEnabledPerVideo.get(chatData.videoId) === false) return;
 
     // Check if this user type should be shown
     let shouldShow = true;
@@ -509,8 +541,8 @@
 
         if (cell) {
           createFlowContainer(cell, videoId);
-          // Create chat overlay (this single iframe handles both reading and writing)
-          createChatOverlay(videoId, cell);
+          // Create background chat iframe for fetching messages
+          createBackgroundChatIframe(videoId, cell);
         }
       }
     });
@@ -529,8 +561,8 @@
 
         if (cell) {
           createFlowContainer(cell, videoId);
-          // Create chat overlay (this single iframe handles both reading and writing)
-          createChatOverlay(videoId, cell);
+          // Create background chat iframe for fetching messages
+          createBackgroundChatIframe(videoId, cell);
         }
       }
     });

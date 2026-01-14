@@ -8,7 +8,7 @@
   height: 100%;
   overflow: hidden;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 100;
 }
 
 .flow-chat-message {
@@ -97,7 +97,7 @@
   background: rgba(0, 0, 0, 0.8);
   border-radius: 8px;
   padding: 12px;
-  z-index: 10001;
+  z-index: 110;
   color: #fff;
   font-family: "Segoe UI", Arial, sans-serif;
   font-size: 14px;
@@ -162,7 +162,7 @@
   height: 50px;
   color: white;
   cursor: pointer;
-  z-index: 10000;
+  z-index: 105;
   font-size: 24px;
   display: flex;
   align-items: center;
@@ -171,6 +171,58 @@
 
 .flow-chat-toggle:hover {
   background: rgba(74, 144, 226, 0.9);
+}
+
+/* Per-video flow chat toggle button */
+.flow-chat-video-toggle {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  color: white;
+  cursor: pointer;
+  z-index: 105;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Show button when hovering over video cell */
+.flow-chat-video-toggle.visible {
+  opacity: 0.5;
+  visibility: visible;
+}
+
+.flow-chat-video-toggle.visible:hover {
+  background: rgba(74, 144, 226, 0.9);
+  opacity: 1;
+}
+
+.flow-chat-video-toggle.disabled {
+  background: rgba(80, 80, 80, 0.7);
+}
+
+.flow-chat-video-toggle.disabled.visible:hover {
+  background: rgba(100, 100, 100, 0.9);
+}
+
+/* Hidden background chat iframe container */
+.flow-chat-bg-container {
+  display: none !important;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Video cell overlay positioning */
@@ -188,7 +240,7 @@
   height: fit-contents;
   background: rgba(0, 0, 0, 0);
   border-radius: 0 8px 0 0;
-  z-index: 10000;
+  z-index: 105;
   pointer-events: auto;
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
   overflow: hidden;
