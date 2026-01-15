@@ -502,14 +502,10 @@
     const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
 
     for (const iframe of chatIframes) {
-      // Skip flow_chat_bg iframes
-      if (iframe.src.includes('flow_chat_bg=true')) continue;
-
       const iframeVideoId = extractVideoId(iframe.src);
       if (iframeVideoId === videoId) {
         // Found chat iframe for this video - check if it's replay
         const isReplay = iframe.src.includes('live_chat_replay');
-        console.log('[Flow Chat Multiview] Chat iframe detected:', isReplay ? 'REPLAY (Archive)' : 'LIVE');
         return !isReplay; // If replay, it's archive (not live)
       }
     }
@@ -519,7 +515,6 @@
     for (const iframe of iframes) {
       const src = iframe.src;
       if (src.includes(videoId) && src.includes('/live/')) {
-        console.log('[Flow Chat Multiview] Video URL contains /live/ - detected as LIVE');
         return true;
       }
     }
@@ -529,7 +524,6 @@
     for (const element of videoElements) {
       const dataStatus = element.getAttribute('data-status');
       if (dataStatus === 'live' || element.classList.contains('live')) {
-        console.log('[Flow Chat Multiview] Data attribute indicates LIVE');
         return true;
       }
     }
@@ -537,140 +531,91 @@
     // Check for live badges
     const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="LiveBadge"]');
     if (liveBadges.length > 0) {
-      console.log('[Flow Chat Multiview] Live badge detected - LIVE');
       return true;
     }
 
-    console.log('[Flow Chat Multiview] No live indicators found - defaulting to ARCHIVE');
     return false;
   }
 
   // Find chat iframe for a video (for archive support)
   function findChatIframeForVideo(videoId) {
-    console.log('[Flow Chat Multiview] Looking for chat iframe for video:', videoId);
     // Look for YouTube live chat iframes in cells (both live and replay)
     const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
-    console.log('[Flow Chat Multiview] Found', chatIframes.length, 'chat iframes (live + replay)');
 
     for (const iframe of chatIframes) {
-      console.log('[Flow Chat Multiview] Checking iframe src:', iframe.src);
-
-      // Skip if this is already a flow_chat_bg iframe
-      if (iframe.src.includes('flow_chat_bg=true')) {
-        console.log('[Flow Chat Multiview] Skipping flow_chat_bg iframe');
-        continue;
-      }
-
-      const iframeSrc = iframe.src;
-      const iframeVideoId = extractVideoId(iframeSrc);
-      console.log('[Flow Chat Multiview] Iframe video ID:', iframeVideoId);
+      const iframeVideoId = extractVideoId(iframe.src);
 
       if (iframeVideoId === videoId) {
-        console.log('[Flow Chat Multiview] Found matching chat iframe for video:', videoId);
         return iframe;
       }
     }
 
-    console.log('[Flow Chat Multiview] No matching chat iframe found for video:', videoId);
     return null;
   }
 
-  // Enable chat observation on existing chat iframe (for Pattern 3 archive chats only)
+  // Enable chat observation on existing chat iframe
+  // Does NOT modify iframe src - chat-observer runs automatically in all YouTube chat iframes
   function enableChatObservationOnIframe(iframe, videoId) {
-    console.log('[Flow Chat Multiview] enableChatObservationOnIframe called for video:', videoId);
-
-    if (!iframe) {
-      console.log('[Flow Chat Multiview] No iframe provided');
+    if (!iframe || backgroundChatIframes.has(videoId)) {
       return;
     }
 
-    if (backgroundChatIframes.has(videoId)) {
-      console.log('[Flow Chat Multiview] Already have chat iframe for video:', videoId);
-      return;
-    }
-
-    console.log('[Flow Chat Multiview] Enabling observation on archive chat iframe');
-    console.log('[Flow Chat Multiview] Current src:', iframe.src);
-
-    // Store this iframe BEFORE modifying src (to avoid reprocessing)
+    // Store this iframe (no src modification needed)
     backgroundChatIframes.set(videoId, iframe);
-    console.log('[Flow Chat Multiview] Stored iframe for video:', videoId);
 
-    // Add flow_chat_bg parameter to existing iframe URL
-    const currentSrc = iframe.src;
-    if (!currentSrc.includes('flow_chat_bg=true')) {
-      const separator = currentSrc.includes('?') ? '&' : '?';
-      const newSrc = currentSrc + separator + 'flow_chat_bg=true';
-      console.log('[Flow Chat Multiview] Setting new src:', newSrc);
-
-      // Force reload with new URL
-      iframe.src = newSrc;
-
-      console.log('[Flow Chat Multiview] Iframe src updated, chat-observer should initialize');
-    } else {
-      console.log('[Flow Chat Multiview] flow_chat_bg=true already present');
-    }
-
-    // Create per-video toggle button
-    const cell = videoCells.get(videoId);
+    // Find or create the cell for this iframe
+    const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
     if (cell) {
-      console.log('[Flow Chat Multiview] Creating toggle button for video:', videoId);
+      videoCells.set(videoId, cell);
+
+      // Create flow container if it doesn't exist
+      if (!flowContainers.has(videoId)) {
+        createFlowContainer(cell, videoId);
+      }
+
+      // Initialize per-video flow enabled state
+      if (!flowEnabledPerVideo.has(videoId)) {
+        flowEnabledPerVideo.set(videoId, true);
+      }
+
+      // Create per-video toggle button
       createPerVideoToggle(videoId, cell);
-    } else {
-      console.log('[Flow Chat Multiview] No cell found for video:', videoId);
     }
   }
 
   // Detect and register videos on the page
   function detectAndRegisterVideos() {
-    console.log('[Flow Chat Multiview] detectAndRegisterVideos called');
-
     // Pattern 1: YouTube embed iframes
     const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
-    console.log('[Flow Chat Multiview] Found', iframes.length, 'YouTube embed iframes');
 
     iframes.forEach((iframe) => {
       const videoId = extractVideoId(iframe.src);
-      console.log('[Flow Chat Multiview] Pattern 1: Extracted video ID:', videoId);
 
       if (videoId && !detectedVideos.has(videoId)) {
-        console.log('[Flow Chat Multiview] Pattern 1: New video detected:', videoId);
         detectedVideos.add(videoId);
 
         // Create flow container
         const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
 
         if (cell) {
-          console.log('[Flow Chat Multiview] Pattern 1: Creating flow container for:', videoId);
           createFlowContainer(cell, videoId);
 
           // Check if video is live or archive
           const isLive = checkIfVideoIsLive(videoId);
-          console.log('[Flow Chat Multiview] Pattern 1: Video is', isLive ? 'LIVE' : 'ARCHIVE');
 
           if (isLive) {
-            // Live stream: always create background chat iframe
-            console.log('[Flow Chat Multiview] Pattern 1: Creating background iframe for LIVE stream:', videoId);
+            // Live stream: create background chat iframe
             createBackgroundChatIframe(videoId, cell);
           } else {
-            // Archive: search for existing chat iframe
-            console.log('[Flow Chat Multiview] Pattern 1: Archive video, searching for chat iframe...');
+            // Archive: find existing chat iframe
             const existingChatIframe = findChatIframeForVideo(videoId);
 
             if (existingChatIframe) {
-              console.log('[Flow Chat Multiview] Pattern 1: Found chat iframe for archive, enabling observation');
+              // Enable observation on existing iframe (no src modification)
               enableChatObservationOnIframe(existingChatIframe, videoId);
-            } else {
-              console.log('[Flow Chat Multiview] Pattern 1: No chat iframe found for archive (will be detected later if added)');
             }
           }
-        } else {
-          console.log('[Flow Chat Multiview] Pattern 1: No cell found for video:', videoId);
         }
-      } else if (!videoId) {
-        console.log('[Flow Chat Multiview] Pattern 1: Failed to extract video ID from iframe');
-      } else {
-        console.log('[Flow Chat Multiview] Pattern 1: Video already detected:', videoId);
       }
     });
 
@@ -679,93 +624,57 @@
 
     videoElements.forEach((element) => {
       const videoId = element.getAttribute('data-video-id');
-      console.log('[Flow Chat Multiview] Pattern 2: Extracted video ID:', videoId);
 
       if (videoId && !detectedVideos.has(videoId)) {
-        console.log('[Flow Chat Multiview] Pattern 2: New video detected:', videoId);
         detectedVideos.add(videoId);
 
         // Create flow container
         const cell = element.closest('.video-cell, [class*="cell"]') || element;
 
         if (cell) {
-          console.log('[Flow Chat Multiview] Pattern 2: Creating flow container for:', videoId);
           createFlowContainer(cell, videoId);
 
           // Check if video is live or archive
           const isLive = checkIfVideoIsLive(videoId);
-          console.log('[Flow Chat Multiview] Pattern 2: Video is', isLive ? 'LIVE' : 'ARCHIVE');
 
           if (isLive) {
-            // Live stream: always create background chat iframe
-            console.log('[Flow Chat Multiview] Pattern 2: Creating background iframe for LIVE stream:', videoId);
+            // Live stream: create background chat iframe
             createBackgroundChatIframe(videoId, cell);
           } else {
-            // Archive: search for existing chat iframe
-            console.log('[Flow Chat Multiview] Pattern 2: Archive video, searching for chat iframe...');
+            // Archive: find existing chat iframe
             const existingChatIframe = findChatIframeForVideo(videoId);
 
             if (existingChatIframe) {
-              console.log('[Flow Chat Multiview] Pattern 2: Found chat iframe for archive, enabling observation');
+              // Enable observation on existing iframe (no src modification)
               enableChatObservationOnIframe(existingChatIframe, videoId);
-            } else {
-              console.log('[Flow Chat Multiview] Pattern 2: No chat iframe found for archive (will be detected later if added)');
             }
           }
-        } else {
-          console.log('[Flow Chat Multiview] Pattern 2: No cell found for video:', videoId);
         }
-      } else if (!videoId) {
-        console.log('[Flow Chat Multiview] Pattern 2: No video ID found');
-      } else {
-        console.log('[Flow Chat Multiview] Pattern 2: Video already detected:', videoId);
       }
     });
 
     // Pattern 3: Standalone chat iframes (for archive chat cells without video)
-    // Only process chat iframes that don't have a corresponding background iframe yet
     const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
-    console.log('[Flow Chat Multiview] Pattern 3: Found', chatIframes.length, 'chat iframes');
 
     chatIframes.forEach((iframe) => {
-      // Skip if already processed as flow_chat_bg
-      if (iframe.src.includes('flow_chat_bg=true')) {
-        console.log('[Flow Chat Multiview] Pattern 3: Skipping flow_chat_bg iframe');
-        return;
-      }
-
       const videoId = extractVideoId(iframe.src);
-      console.log('[Flow Chat Multiview] Pattern 3: Chat iframe for video:', videoId);
+      if (!videoId) return;
 
-      if (!videoId) {
-        console.log('[Flow Chat Multiview] Pattern 3: Failed to extract video ID');
-        return;
-      }
-
-      // Skip if we already have a background iframe for this video
-      if (backgroundChatIframes.has(videoId)) {
-        console.log('[Flow Chat Multiview] Pattern 3: Already have background iframe for:', videoId);
-        return;
-      }
+      // Skip if we already registered this video
+      if (backgroundChatIframes.has(videoId)) return;
 
       // This is an archive chat cell without a video - create flow for it
       const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
 
       if (cell) {
-        console.log('[Flow Chat Multiview] Pattern 3: Found cell for archive chat');
-
         // Create flow container if it doesn't exist
         if (!flowContainers.has(videoId)) {
-          console.log('[Flow Chat Multiview] Pattern 3: Creating flow container for archive chat:', videoId);
           detectedVideos.add(videoId);
           createFlowContainer(cell, videoId);
         }
 
-        // Enable observation on this existing chat iframe
-        console.log('[Flow Chat Multiview] Pattern 3: Enabling observation on archive chat iframe');
+        // Enable observation on this existing chat iframe (no src modification)
         enableChatObservationOnIframe(iframe, videoId);
-      } else {
-        console.log('[Flow Chat Multiview] Pattern 3: No cell found for chat iframe');
       }
     });
   }
@@ -1059,7 +968,6 @@
               // Check for YouTube iframes
               if (node.querySelector('iframe[src*="youtube.com"]') ||
                   node.tagName === 'IFRAME' && node.src?.includes('youtube.com')) {
-                console.log('[Flow Chat Multiview] New YouTube iframe detected');
                 shouldReinitialize = true;
               }
               // Check for video ID attributes
@@ -1077,22 +985,13 @@
         if (mutation.type === 'attributes' && mutation.target.tagName === 'IFRAME') {
           const iframe = mutation.target;
           if (iframe.src && (iframe.src.includes('live_chat') || iframe.src.includes('live_chat_replay'))) {
-            // Skip if this is already a flow_chat_bg iframe
-            if (iframe.src.includes('flow_chat_bg=true')) {
-              return;
-            }
-
-            console.log('[Flow Chat Multiview] Chat iframe src changed:', iframe.src);
             const newVideoId = extractVideoId(iframe.src);
 
             if (newVideoId) {
-              console.log('[Flow Chat Multiview] Chat iframe switched to video:', newVideoId);
-
               // Remove ALL old references to this iframe
               const toDelete = [];
               backgroundChatIframes.forEach((storedIframe, storedVideoId) => {
                 if (storedIframe === iframe) {
-                  console.log('[Flow Chat Multiview] Removing old chat iframe reference for:', storedVideoId);
                   toDelete.push(storedVideoId);
                 }
               });
@@ -1106,7 +1005,6 @@
       });
 
       if (shouldReinitialize) {
-        console.log('[Flow Chat Multiview] Change detected, re-detecting videos in 1s');
         setTimeout(detectAndRegisterVideos, 1000);
       }
     });
@@ -1120,7 +1018,6 @@
 
     // Also periodically check for new videos and chat iframes
     setInterval(() => {
-      console.log('[Flow Chat Multiview] Periodic check for new videos/chats');
       detectAndRegisterVideos();
     }, 10000); // Check every 10 seconds
   }

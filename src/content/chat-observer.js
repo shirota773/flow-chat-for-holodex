@@ -4,23 +4,8 @@
 (function() {
   'use strict';
 
-  // Check if this is a Flow Chat enabled iframe
-  const urlParams = new URLSearchParams(window.location.search);
-  const isBackgroundChat = urlParams.get('flow_chat_bg') === 'true';
-  const isWatchChat = urlParams.get('flow_chat') === 'true';
-
-  console.log('[Flow Chat Observer] URL params check:');
-  console.log('[Flow Chat Observer] Current URL:', window.location.href);
-  console.log('[Flow Chat Observer] isBackgroundChat:', isBackgroundChat);
-  console.log('[Flow Chat Observer] isWatchChat:', isWatchChat);
-
-  // Only run in Flow Chat enabled iframes (background or watch page)
-  if (!isBackgroundChat && !isWatchChat) {
-    console.log('[Flow Chat Observer] Not a Flow Chat enabled iframe, exiting');
-    return;
-  }
-
-  console.log('[Flow Chat Observer] Flow Chat enabled, initializing observer');
+  // Always run in YouTube chat iframes within Holodex
+  // No URL parameter check needed - messages are only sent to holodex.net
 
   let observer = null;
   let isEnabled = true;
