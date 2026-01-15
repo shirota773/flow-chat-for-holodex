@@ -594,10 +594,18 @@
           console.log('[Flow Chat Multiview] Pattern 1: Creating flow container for:', videoId);
           createFlowContainer(cell, videoId);
 
-          // ALWAYS create background chat iframe for Pattern 1 (video embeds)
-          // This ensures live streams work correctly without relying on cell chat
-          console.log('[Flow Chat Multiview] Pattern 1: Creating background iframe for video:', videoId);
-          createBackgroundChatIframe(videoId, cell);
+          // Check if video is live or archive
+          const isLive = checkIfVideoIsLive(videoId);
+          console.log('[Flow Chat Multiview] Pattern 1: Video is', isLive ? 'LIVE' : 'ARCHIVE');
+
+          if (isLive) {
+            // Live stream: always create background chat iframe
+            console.log('[Flow Chat Multiview] Pattern 1: Creating background iframe for LIVE stream:', videoId);
+            createBackgroundChatIframe(videoId, cell);
+          } else {
+            // Archive: do nothing here, Pattern 3 will handle chat detection
+            console.log('[Flow Chat Multiview] Pattern 1: Archive video, waiting for Pattern 3 to detect chat');
+          }
         } else {
           console.log('[Flow Chat Multiview] Pattern 1: No cell found for video:', videoId);
         }
@@ -626,9 +634,18 @@
           console.log('[Flow Chat Multiview] Pattern 2: Creating flow container for:', videoId);
           createFlowContainer(cell, videoId);
 
-          // ALWAYS create background chat iframe for Pattern 2 (video elements)
-          console.log('[Flow Chat Multiview] Pattern 2: Creating background iframe for video:', videoId);
-          createBackgroundChatIframe(videoId, cell);
+          // Check if video is live or archive
+          const isLive = checkIfVideoIsLive(videoId);
+          console.log('[Flow Chat Multiview] Pattern 2: Video is', isLive ? 'LIVE' : 'ARCHIVE');
+
+          if (isLive) {
+            // Live stream: always create background chat iframe
+            console.log('[Flow Chat Multiview] Pattern 2: Creating background iframe for LIVE stream:', videoId);
+            createBackgroundChatIframe(videoId, cell);
+          } else {
+            // Archive: do nothing here, Pattern 3 will handle chat detection
+            console.log('[Flow Chat Multiview] Pattern 2: Archive video, waiting for Pattern 3 to detect chat');
+          }
         } else {
           console.log('[Flow Chat Multiview] Pattern 2: No cell found for video:', videoId);
         }
