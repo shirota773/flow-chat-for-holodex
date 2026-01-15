@@ -1,5 +1,5 @@
-// Flow Chat for Holodex - Main Content Script
-// Manages flow display on Holodex multiview page
+// Flow Chat for Holodex Watch - Watch page content script
+// Manages flow display on Holodex watch page (single video view)
 
 (function() {
   'use strict';
@@ -7,39 +7,35 @@
   // Default settings
   const defaultSettings = {
     enabled: true,
-    displayTime: 8,  // seconds to display on screen
-    fontSize: 28,    // pixels
+    displayTime: 8,
+    fontSize: 28,
     opacity: 1.0,
-    maxMessages: 100, // max simultaneous messages (increased from 50)
-    displayArea: 1.0, // percentage of screen height to use (0.0-1.0)
-    minVerticalGap: 4, // minimum pixels between messages vertically
-    // Show/hide comments per user type
+    maxMessages: 100,
+    displayArea: 1.0,
+    minVerticalGap: 4,
     showOwner: true,
     showModerator: true,
     showMember: true,
     showNormal: true,
-    // Avatar settings per user type
     avatarOwner: true,
     avatarModerator: false,
     avatarMember: false,
     avatarNormal: false,
-    // Color settings per user type (RGB)
-    colorOwner: { r: 255, g: 215, b: 0 },      // Gold
-    colorModerator: { r: 94, g: 132, b: 241 },  // Blue
-    colorMember: { r: 46, g: 204, b: 113 },     // Green
-    colorNormal: { r: 255, g: 255, b: 255 }     // White
+    colorOwner: { r: 255, g: 215, b: 0 },
+    colorModerator: { r: 94, g: 132, b: 241 },
+    colorMember: { r: 46, g: 204, b: 113 },
+    colorNormal: { r: 255, g: 255, b: 255 }
   };
 
   let settings = { ...defaultSettings };
-  let flowContainers = new Map(); // videoId -> container element
-  let activeMessages = new Map(); // videoId -> array of active message info
+  let flowContainer = null;
+  let activeMessages = [];
   let messageCount = 0;
   let controlsVisible = false;
-  let backgroundChatIframes = new Map(); // videoId -> iframe element
-  let detectedVideos = new Set(); // Track detected video IDs to avoid duplicates
-  let chatOverlays = new Map(); // videoId -> chat overlay element
-  let videoCells = new Map(); // videoId -> video cell element
-  let flowEnabledPerVideo = new Map(); // videoId -> boolean (per-video flow chat enabled state)
+  let videoId = null;
+  let chatIframe = null;
+  let flowEnabled = true;
+  let videoContainer = null;
 
   // Load settings from storage
   function loadSettings() {
@@ -52,7 +48,7 @@
     });
   }
 
-  // Listen for storage changes (for immediate settings application)
+  // Listen for storage changes
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'sync' && changes.flowChatSettings) {
       settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
@@ -65,171 +61,160 @@
     chrome.storage.sync.set({ flowChatSettings: settings });
   }
 
-  // Find all video cells in Holodex multiview
-  function findVideoCells() {
-    // Holodex uses a grid of video cells
-    const cells = document.querySelectorAll('.video-cell, [class*="cell"], .v-responsive');
-    return Array.from(cells).filter(cell => {
-      // Filter to cells that contain video iframes
-      return cell.querySelector('iframe[src*="youtube.com/embed"]') ||
-             cell.querySelector('video') ||
-             cell.querySelector('[class*="player"]');
-    });
+  // Extract video ID from URL or iframe
+  function extractVideoId(url) {
+    if (!url) return null;
+
+    let match = url.match(/[?&]v=([^&]+)/);
+    if (match) return match[1];
+
+    match = url.match(/\/embed\/([^?&]+)/);
+    if (match) return match[1];
+
+    match = url.match(/\/watch\/([^?&#]+)/);
+    if (match) return match[1];
+
+    return null;
   }
 
-  // Create flow container for a video cell
-  function createFlowContainer(videoCell, videoId) {
-    if (flowContainers.has(videoId)) {
-      return flowContainers.get(videoId);
-    }
-
-    const container = document.createElement('div');
-    container.className = 'flow-chat-container';
-    container.dataset.videoId = videoId;
-
-    // Ensure video cell has relative positioning
-    const computedStyle = window.getComputedStyle(videoCell);
-    if (computedStyle.position === 'static') {
-      videoCell.style.position = 'relative';
-    }
-
-    videoCell.appendChild(container);
-    flowContainers.set(videoId, container);
-    activeMessages.set(videoId, []);
-    videoCells.set(videoId, videoCell);
-
-    return container;
+  // Get video ID from current page URL
+  function getVideoIdFromPage() {
+    const url = window.location.href;
+    return extractVideoId(url);
   }
 
-  // Create background chat iframe for fetching messages (hidden, no hover display)
-  function createBackgroundChatIframe(videoId, videoCell) {
-    if (backgroundChatIframes.has(videoId)) {
-      return backgroundChatIframes.get(videoId);
-    }
+  // Find the video container (where we'll overlay the flow chat)
+  function findVideoContainer() {
+    // Look for the main video player area in Holodex watch page
+    const selectors = [
+      '.v-responsive', // Vuetify responsive container
+      '[class*="video-container"]',
+      '[class*="player-container"]',
+      'iframe[src*="youtube.com/embed"]'
+    ];
 
-    // Initialize per-video flow enabled state (default: enabled)
-    if (!flowEnabledPerVideo.has(videoId)) {
-      flowEnabledPerVideo.set(videoId, true);
-    }
-
-    // Create hidden container for background chat iframe
-    const container = document.createElement('div');
-    container.className = 'flow-chat-bg-container';
-    container.dataset.videoId = videoId;
-    container.style.display = 'none'; // Always hidden
-
-    // Create iframe for chat (background only, for reading messages)
-    const baseUrl = window.location.hostname;
-    const isLive = checkIfVideoIsLive(videoId);
-    // Add flow_chat_bg=true parameter so chat-observer.js can detect and monitor this iframe
-    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-
-    const iframe = document.createElement('iframe');
-    iframe.src = isLive ? liveUrl : replayUrl;
-    iframe.className = 'flow-chat-bg-iframe';
-    iframe.allow = 'autoplay; encrypted-media';
-    iframe.setAttribute('data-video-id', videoId);
-
-    // Store iframe reference for message handling
-    backgroundChatIframes.set(videoId, iframe);
-
-    container.appendChild(iframe);
-    videoCell.appendChild(container);
-
-    // If not live, try switching to live URL after 5 seconds
-    if (!isLive) {
-      setTimeout(() => {
-        if (checkIfVideoIsLive(videoId)) {
-          iframe.src = liveUrl;
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        // If it's an iframe, get its parent container
+        if (element.tagName === 'IFRAME') {
+          return element.closest('.v-responsive') || element.parentElement;
         }
-      }, 5000);
+        return element;
+      }
     }
 
-    // Create per-video toggle button
-    createPerVideoToggle(videoId, videoCell);
-
-    return iframe;
+    return null;
   }
 
-  // Create per-video flow chat toggle button
-  function createPerVideoToggle(videoId, videoCell) {
+  // Find existing YouTube chat iframe on the page
+  function findChatIframe() {
+    const iframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
+
+    for (const iframe of iframes) {
+      // Skip if this is a flow_chat_bg iframe
+      if (iframe.src.includes('flow_chat_bg=true')) {
+        continue;
+      }
+
+      const srcVideoId = extractVideoId(iframe.src);
+      if (srcVideoId === videoId || !videoId) {
+        return iframe;
+      }
+    }
+
+    return null;
+  }
+
+  // Create flow container overlay on video
+  function createFlowContainer(container) {
+    if (flowContainer) {
+      return flowContainer;
+    }
+
+    const flowDiv = document.createElement('div');
+    flowDiv.className = 'flow-chat-container';
+    flowDiv.dataset.videoId = videoId;
+
+    // Ensure container has relative positioning
+    const computedStyle = window.getComputedStyle(container);
+    if (computedStyle.position === 'static') {
+      container.style.position = 'relative';
+    }
+
+    container.appendChild(flowDiv);
+    flowContainer = flowDiv;
+    activeMessages = [];
+
+    return flowDiv;
+  }
+
+  // Mark existing chat iframe to enable flow chat observation
+  function enableChatObservation(iframe) {
+    if (!iframe) return;
+
+    // Add flow_chat parameter to iframe URL if not already present
+    const currentSrc = iframe.src;
+    if (!currentSrc.includes('flow_chat=true')) {
+      const separator = currentSrc.includes('?') ? '&' : '?';
+      iframe.src = currentSrc + separator + 'flow_chat=true';
+    }
+  }
+
+  // Create per-video toggle button
+  function createToggleButton() {
+    if (!videoContainer) return;
+
     const toggle = document.createElement('button');
-    toggle.className = 'flow-chat-video-toggle';
+    toggle.className = 'flow-chat-video-toggle visible';
     toggle.dataset.videoId = videoId;
     toggle.title = 'Toggle Flow Chat';
 
-    // Set initial state
-    const isEnabled = flowEnabledPerVideo.get(videoId) !== false;
-    toggle.innerHTML = isEnabled ? '💬' : '🚫';
-    toggle.classList.toggle('disabled', !isEnabled);
+    toggle.innerHTML = flowEnabled ? '💬' : '🚫';
+    toggle.classList.toggle('disabled', !flowEnabled);
 
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
-      const currentState = flowEnabledPerVideo.get(videoId) !== false;
-      const newState = !currentState;
-      flowEnabledPerVideo.set(videoId, newState);
+      flowEnabled = !flowEnabled;
 
-      toggle.innerHTML = newState ? '💬' : '🚫';
-      toggle.classList.toggle('disabled', !newState);
+      toggle.innerHTML = flowEnabled ? '💬' : '🚫';
+      toggle.classList.toggle('disabled', !flowEnabled);
 
-      // Show/hide flow container based on state
-      const container = flowContainers.get(videoId);
-      if (container) {
-        container.style.display = newState ? 'block' : 'none';
+      if (flowContainer) {
+        flowContainer.style.display = flowEnabled ? 'block' : 'none';
       }
     });
 
-    // Add hover listeners to video cell for showing/hiding toggle button
-    videoCell.addEventListener('mouseenter', () => {
-      toggle.classList.add('visible');
-    });
-
-    videoCell.addEventListener('mouseleave', () => {
-      toggle.classList.remove('visible');
-    });
-
-    videoCell.appendChild(toggle);
+    videoContainer.appendChild(toggle);
   }
 
   // Check if two messages would collide
   function wouldCollide(msg1, msg2, containerWidth) {
-    // Vertical overlap check
     if (msg1.top + msg1.height + settings.minVerticalGap <= msg2.top ||
         msg2.top + msg2.height + settings.minVerticalGap <= msg1.top) {
-      return false; // No vertical overlap
+      return false;
     }
 
-    // Horizontal collision check
-    // Each message has its own speed based on its width and displayTime
     const now = Date.now();
-
-    // Calculate speed for each message (pixels per second)
     const msg1Speed = (containerWidth + msg1.width) / settings.displayTime;
     const msg2Speed = (containerWidth + msg2.width) / settings.displayTime;
 
-    // Calculate current positions
     const msg1Left = containerWidth - msg1Speed * (now - msg1.startTime) / 1000;
     const msg1Right = msg1Left + msg1.width;
 
     const msg2Left = containerWidth - msg2Speed * (now - msg2.startTime) / 1000;
     const msg2Right = msg2Left + msg2.width;
 
-    // If they overlap now, they collide
     if (msg1Right > msg2Left && msg1Left < msg2Right) {
       return true;
     }
 
-    // Check if they will collide in the future (faster message catches up)
-    // If msg2 is faster and behind msg1, check if it will catch up
     if (msg2Speed > msg1Speed && msg2Left > msg1Left) {
-      // Time for msg2's head to reach msg1's tail
       const relativeSpeed = msg2Speed - msg1Speed;
       const distance = msg2Left - msg1Right;
-      const timeToCollide = (distance / relativeSpeed) * 1000; // ms
-
-      // Check if collision happens before msg1 exits screen
+      const timeToCollide = (distance / relativeSpeed) * 1000;
       const msg1ExitTime = (msg1Right / msg1Speed) * 1000;
+
       if (timeToCollide < msg1ExitTime) {
         return true;
       }
@@ -239,12 +224,8 @@
   }
 
   // Find available Y position for new message
-  function findAvailablePosition(videoId, messageWidth, messageHeight, containerWidth, containerHeight) {
-    const messages = activeMessages.get(videoId) || [];
+  function findAvailablePosition(messageWidth, messageHeight, containerWidth, containerHeight) {
     const maxY = containerHeight * settings.displayArea - messageHeight;
-
-    // Try to place message at each possible Y position
-    // Start from top, find first non-colliding position
     const step = messageHeight + settings.minVerticalGap;
 
     for (let y = 0; y <= maxY; y += step) {
@@ -257,7 +238,7 @@
 
       let hasCollision = false;
 
-      for (const existingMsg of messages) {
+      for (const existingMsg of activeMessages) {
         if (wouldCollide(existingMsg, newMsg, containerWidth)) {
           hasCollision = true;
           break;
@@ -269,17 +250,12 @@
       }
     }
 
-    // No available position found
     return -1;
   }
 
   // Create flow message element
   function createFlowMessage(chatData) {
-    const container = flowContainers.get(chatData.videoId);
-    if (!container || !settings.enabled) return;
-
-    // Check per-video flow enabled state
-    if (flowEnabledPerVideo.get(chatData.videoId) === false) return;
+    if (!flowContainer || !settings.enabled || !flowEnabled) return;
 
     // Check if this user type should be shown
     let shouldShow = true;
@@ -300,8 +276,7 @@
     if (!shouldShow) return;
 
     // Limit simultaneous messages
-    if (container.children.length >= settings.maxMessages) {
-      // Skip this message if at capacity
+    if (flowContainer.children.length >= settings.maxMessages) {
       return;
     }
 
@@ -375,27 +350,25 @@
         }
       });
     } else if (chatData.message) {
-      // Fallback for old format
       messageContent.textContent = chatData.message;
     }
 
     messageEl.appendChild(messageContent);
 
-    // Temporarily add to DOM to measure width (hidden)
+    // Temporarily add to DOM to measure width
     messageEl.style.visibility = 'hidden';
     messageEl.style.position = 'absolute';
     messageEl.style.left = '-9999px';
-    container.appendChild(messageEl);
+    flowContainer.appendChild(messageEl);
 
     // Get actual message dimensions
     const messageWidth = messageEl.offsetWidth;
     const messageHeight = messageEl.offsetHeight;
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+    const containerWidth = flowContainer.offsetWidth;
+    const containerHeight = flowContainer.offsetHeight;
 
-    // Find available Y position (collision detection)
+    // Find available Y position
     const topPosition = findAvailablePosition(
-      chatData.videoId,
       messageWidth,
       messageHeight,
       containerWidth,
@@ -403,16 +376,14 @@
     );
 
     if (topPosition === -1) {
-      // No available position, remove message and skip
       messageEl.remove();
       return;
     }
 
-    // Animation duration is fixed to displayTime (seconds)
     const totalDistance = containerWidth + messageWidth;
-    const animationDuration = settings.displayTime; // seconds
+    const animationDuration = settings.displayTime;
 
-    // Track this message for collision detection
+    // Track this message
     const messageInfo = {
       top: topPosition,
       height: messageHeight,
@@ -421,26 +392,24 @@
       element: messageEl
     };
 
-    const messages = activeMessages.get(chatData.videoId);
-    messages.push(messageInfo);
+    activeMessages.push(messageInfo);
 
     // Reset positioning for animation
     messageEl.style.visibility = 'visible';
     messageEl.style.position = 'absolute';
-    messageEl.style.left = '100%'; // Start from right edge
+    messageEl.style.left = '100%';
     messageEl.style.top = `${topPosition}px`;
 
-    // Set custom animation with proper distance and fixed speed
+    // Set animation
     messageEl.style.setProperty('--flow-distance', `-${totalDistance}px`);
     messageEl.style.animationDuration = `${animationDuration}s`;
 
     // Remove after animation
     messageEl.addEventListener('animationend', () => {
       messageEl.remove();
-      // Remove from active messages
-      const idx = messages.indexOf(messageInfo);
+      const idx = activeMessages.indexOf(messageInfo);
       if (idx > -1) {
-        messages.splice(idx, 1);
+        activeMessages.splice(idx, 1);
       }
       messageCount--;
     });
@@ -455,215 +424,15 @@
     const { type, data } = event.data;
 
     if (type === 'FLOW_CHAT_MESSAGE' && data) {
-      createFlowMessage(data);
-    } else if (type === 'FLOW_CHAT_READY') {
-      if (data && data.videoId) {
-        setupVideoCell(data.videoId);
+      // Only process if video IDs match or if no video ID in data
+      if (!data.videoId || data.videoId === videoId) {
+        createFlowMessage(data);
       }
     }
   }
 
-  // Setup video cell based on video ID
-  function setupVideoCell(videoId) {
-    // Find the iframe or cell containing this video
-    const iframes = document.querySelectorAll('iframe[src*="youtube.com"]');
-
-    iframes.forEach(iframe => {
-      const src = iframe.src || '';
-      if (src.includes(videoId) || src.includes('embed')) {
-        const cell = iframe.closest('.video-cell, [class*="cell"]') ||
-                     iframe.parentElement?.parentElement;
-        if (cell) {
-          createFlowContainer(cell, videoId);
-        }
-      }
-    });
-  }
-
-  // Extract video ID from URL
-  function extractVideoId(url) {
-    if (!url) return null;
-
-    let match = url.match(/[?&]v=([^&]+)/);
-    if (match) return match[1];
-
-    match = url.match(/\/embed\/([^?&]+)/);
-    if (match) return match[1];
-
-    match = url.match(/\/watch\/([^?&]+)/);
-    if (match) return match[1];
-
-    return null;
-  }
-
-  // Check if video is live or archived
-  function checkIfVideoIsLive(videoId) {
-    // Check iframe URLs for live indicators
-    const iframes = document.querySelectorAll('iframe[src*="youtube.com"]');
-    for (const iframe of iframes) {
-      const src = iframe.src;
-      if (src.includes(videoId) && src.includes('/live/')) {
-        return true;
-      }
-    }
-
-    // Check data attributes
-    const videoElements = document.querySelectorAll(`[data-video-id="${videoId}"]`);
-    for (const element of videoElements) {
-      const dataStatus = element.getAttribute('data-status');
-      if (dataStatus === 'live' || element.classList.contains('live')) {
-        return true;
-      }
-    }
-
-    // Check for live badges
-    const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="LiveBadge"]');
-    if (liveBadges.length > 0) {
-      return true;
-    }
-
-    return false;
-  }
-
-  // Find chat iframe for a video (for archive support)
-  function findChatIframeForVideo(videoId) {
-    // Look for YouTube live chat iframes in cells
-    const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
-
-    for (const iframe of chatIframes) {
-      // Skip if this is already a flow_chat_bg iframe
-      if (iframe.src.includes('flow_chat_bg=true')) {
-        continue;
-      }
-
-      const iframeSrc = iframe.src;
-      const iframeVideoId = extractVideoId(iframeSrc);
-
-      if (iframeVideoId === videoId) {
-        return iframe;
-      }
-    }
-
-    return null;
-  }
-
-  // Enable chat observation on existing chat iframe
-  function enableChatObservationOnIframe(iframe, videoId) {
-    if (!iframe || backgroundChatIframes.has(videoId)) return;
-
-    // Add flow_chat_bg parameter to existing iframe URL
-    const currentSrc = iframe.src;
-    if (!currentSrc.includes('flow_chat_bg=true')) {
-      const separator = currentSrc.includes('?') ? '&' : '?';
-      iframe.src = currentSrc + separator + 'flow_chat_bg=true';
-    }
-
-    // Store this iframe as the chat source
-    backgroundChatIframes.set(videoId, iframe);
-
-    // Create per-video toggle button
-    const cell = videoCells.get(videoId);
-    if (cell) {
-      createPerVideoToggle(videoId, cell);
-    }
-  }
-
-  // Detect and register videos on the page
-  function detectAndRegisterVideos() {
-    // Pattern 1: YouTube embed iframes
-    const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
-
-    iframes.forEach((iframe) => {
-      const videoId = extractVideoId(iframe.src);
-
-      if (videoId && !detectedVideos.has(videoId)) {
-        detectedVideos.add(videoId);
-
-        // Create flow container
-        const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
-
-        if (cell) {
-          createFlowContainer(cell, videoId);
-
-          // Check if there's an existing chat iframe for this video (archive support)
-          const existingChatIframe = findChatIframeForVideo(videoId);
-
-          if (existingChatIframe) {
-            // Use the existing chat iframe instead of creating a new one
-            enableChatObservationOnIframe(existingChatIframe, videoId);
-          } else {
-            // Create background chat iframe for fetching messages (live streams)
-            createBackgroundChatIframe(videoId, cell);
-          }
-        }
-      }
-    });
-
-    // Pattern 2: Elements with data-video-id attribute
-    const videoElements = document.querySelectorAll('[data-video-id]');
-
-    videoElements.forEach((element) => {
-      const videoId = element.getAttribute('data-video-id');
-
-      if (videoId && !detectedVideos.has(videoId)) {
-        detectedVideos.add(videoId);
-
-        // Create flow container
-        const cell = element.closest('.video-cell, [class*="cell"]') || element;
-
-        if (cell) {
-          createFlowContainer(cell, videoId);
-
-          // Check if there's an existing chat iframe for this video (archive support)
-          const existingChatIframe = findChatIframeForVideo(videoId);
-
-          if (existingChatIframe) {
-            // Use the existing chat iframe instead of creating a new one
-            enableChatObservationOnIframe(existingChatIframe, videoId);
-          } else {
-            // Create background chat iframe for fetching messages (live streams)
-            createBackgroundChatIframe(videoId, cell);
-          }
-        }
-      }
-    });
-
-    // Pattern 3: Standalone chat iframes (for videos that might not be detected yet)
-    const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
-
-    chatIframes.forEach((iframe) => {
-      // Skip if already processed as flow_chat_bg
-      if (iframe.src.includes('flow_chat_bg=true')) {
-        return;
-      }
-
-      const videoId = extractVideoId(iframe.src);
-
-      if (videoId && !backgroundChatIframes.has(videoId)) {
-        // Try to find corresponding video cell for this chat
-        const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
-
-        if (cell) {
-          // Check if we already have a flow container for this video
-          if (!flowContainers.has(videoId)) {
-            detectedVideos.add(videoId);
-            createFlowContainer(cell, videoId);
-          }
-
-          // Enable observation on this chat iframe
-          enableChatObservationOnIframe(iframe, videoId);
-        }
-      }
-    });
-  }
-
-  // Initialize flow containers for all visible videos
-  function initializeContainers() {
-    detectAndRegisterVideos();
-  }
-
-  // Create toggle button
-  function createToggleButton() {
+  // Create global toggle button
+  function createGlobalToggleButton() {
     const toggle = document.createElement('button');
     toggle.className = 'flow-chat-toggle';
     toggle.innerHTML = '💬';
@@ -680,7 +449,7 @@
     document.body.appendChild(toggle);
   }
 
-  // Create control panel
+  // Create control panel (same as multiview)
   function createControlPanel() {
     const panel = document.createElement('div');
     panel.className = 'flow-chat-controls';
@@ -774,7 +543,6 @@
     document.body.appendChild(panel);
 
     // Event listeners
-    // Close button
     panel.querySelector('#flow-close-btn').addEventListener('click', () => {
       hideControls();
     });
@@ -841,9 +609,10 @@
     });
 
     panel.querySelector('#flow-clear').addEventListener('click', () => {
-      flowContainers.forEach(container => {
-        container.innerHTML = '';
-      });
+      if (flowContainer) {
+        flowContainer.innerHTML = '';
+      }
+      activeMessages = [];
       messageCount = 0;
     });
 
@@ -853,7 +622,6 @@
     });
   }
 
-  // Update control panel UI with current settings (for immediate sync)
   function updateControlPanelUI() {
     const panel = document.getElementById('flow-chat-controls');
     if (!panel) return;
@@ -917,13 +685,11 @@
     }
   }
 
-  // Close panel when clicking outside
   function handleOutsideClick(event) {
     const panel = document.getElementById('flow-chat-controls');
     const toggle = document.querySelector('.flow-chat-toggle');
 
     if (controlsVisible && panel && toggle) {
-      // Check if click is outside both panel and toggle button
       if (!panel.contains(event.target) && !toggle.contains(event.target)) {
         hideControls();
       }
@@ -934,65 +700,71 @@
     // Update any global styles based on settings
   }
 
-  // Watch for DOM changes to detect new video cells
-  function watchForNewCells() {
-    const observer = new MutationObserver((mutations) => {
-      let shouldReinitialize = false;
-
-      mutations.forEach(mutation => {
-        if (mutation.addedNodes.length > 0) {
-          mutation.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              // Check for YouTube iframes
-              if (node.querySelector('iframe[src*="youtube.com"]') ||
-                  node.tagName === 'IFRAME' && node.src?.includes('youtube.com')) {
-                shouldReinitialize = true;
-              }
-              // Check for video ID attributes
-              if (node.hasAttribute && node.hasAttribute('data-video-id')) {
-                shouldReinitialize = true;
-              }
-              if (node.querySelector && node.querySelector('[data-video-id]')) {
-                shouldReinitialize = true;
-              }
-            }
-          });
+  // Watch for chat iframe to appear
+  function watchForChatIframe() {
+    const checkForChat = () => {
+      if (!chatIframe) {
+        const iframe = findChatIframe();
+        if (iframe) {
+          chatIframe = iframe;
+          enableChatObservation(iframe);
         }
-      });
-
-      if (shouldReinitialize) {
-        setTimeout(detectAndRegisterVideos, 1000);
       }
+    };
+
+    // Check periodically
+    setInterval(checkForChat, 2000);
+
+    // Also watch for DOM changes
+    const observer = new MutationObserver(() => {
+      checkForChat();
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
-
-    // Also periodically check for new videos
-    setInterval(() => {
-      detectAndRegisterVideos();
-    }, 10000); // Check every 10 seconds
   }
 
   // Initialize extension
   function init() {
     loadSettings();
-    createToggleButton();
+    createGlobalToggleButton();
     createControlPanel();
 
     // Listen for messages from chat iframes
     window.addEventListener('message', handleChatMessage);
 
-    // Listen for clicks outside the control panel to close it
+    // Listen for clicks outside control panel
     document.addEventListener('click', handleOutsideClick);
 
-    // Initial setup
-    setTimeout(() => {
-      initializeContainers();
-      watchForNewCells();
-    }, 2000);
+    // Get video ID from page
+    videoId = getVideoIdFromPage();
+
+    // Find video container
+    videoContainer = findVideoContainer();
+
+    if (videoContainer) {
+      // Create flow container
+      createFlowContainer(videoContainer);
+
+      // Create toggle button
+      createToggleButton();
+
+      // Look for existing chat iframe
+      setTimeout(() => {
+        chatIframe = findChatIframe();
+        if (chatIframe) {
+          enableChatObservation(chatIframe);
+        }
+
+        // Watch for chat iframe to appear (in case it loads later)
+        watchForChatIframe();
+      }, 2000);
+    } else {
+      // Retry finding video container
+      setTimeout(init, 2000);
+    }
   }
 
   // Start when page is ready

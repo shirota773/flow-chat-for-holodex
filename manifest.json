@@ -19,6 +19,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://holodex.net/watch/*"],
+      "js": ["src/content/watch.js"],
+      "css": ["src/styles/flow.css"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://www.youtube.com/live_chat*"],
       "js": ["src/content/chat-observer.js"],
       "all_frames": true,

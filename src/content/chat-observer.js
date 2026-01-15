@@ -4,12 +4,13 @@
 (function() {
   'use strict';
 
-  // Check if this is a background chat iframe created by Flow Chat
+  // Check if this is a Flow Chat enabled iframe
   const urlParams = new URLSearchParams(window.location.search);
   const isBackgroundChat = urlParams.get('flow_chat_bg') === 'true';
+  const isWatchChat = urlParams.get('flow_chat') === 'true';
 
-  // Only run in background chat iframes to avoid duplication
-  if (!isBackgroundChat) {
+  // Only run in Flow Chat enabled iframes (background or watch page)
+  if (!isBackgroundChat && !isWatchChat) {
     return;
   }
 
