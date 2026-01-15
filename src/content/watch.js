@@ -33,7 +33,7 @@
   let messageCount = 0;
   let controlsVisible = false;
   let videoId = null;
-  let chatIframe = null;
+  let backgroundChatIframe = null;
   let flowEnabled = true;
   let videoContainer = null;
 
@@ -115,32 +115,75 @@
     return null;
   }
 
-  // Find existing YouTube chat iframe on the page
-  function findChatIframe() {
-    console.log('[Flow Chat Watch] Looking for chat iframe, target videoId:', videoId);
-    const iframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
-    console.log('[Flow Chat Watch] Found', iframes.length, 'YouTube chat iframes (live + replay)');
-
-    for (const iframe of iframes) {
-      console.log('[Flow Chat Watch] Checking iframe src:', iframe.src);
-
-      // Skip if this is a flow_chat_bg iframe
-      if (iframe.src.includes('flow_chat_bg=true')) {
-        console.log('[Flow Chat Watch] Skipping flow_chat_bg iframe');
-        continue;
-      }
-
-      const srcVideoId = extractVideoId(iframe.src);
-      console.log('[Flow Chat Watch] Iframe video ID:', srcVideoId);
-
-      if (srcVideoId === videoId || !videoId) {
-        console.log('[Flow Chat Watch] Found matching chat iframe!');
-        return iframe;
-      }
+  // Check if video is live or archived
+  function checkIfVideoIsLive() {
+    // Check page title or other indicators
+    // For now, we'll try to detect from URL patterns or page elements
+    // This is a simplified check - you might need to adjust based on Holodex's structure
+    const pageTitle = document.title.toLowerCase();
+    if (pageTitle.includes('live')) {
+      return true;
     }
 
-    console.log('[Flow Chat Watch] No matching chat iframe found');
-    return null;
+    // Check for live badges on the page
+    const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="live"]');
+    if (liveBadges.length > 0) {
+      return true;
+    }
+
+    // Default to false (archive) - safer assumption
+    return false;
+  }
+
+  // Create background chat iframe for fetching messages
+  function createBackgroundChatIframe() {
+    if (backgroundChatIframe) {
+      console.log('[Flow Chat Watch] Background chat iframe already exists');
+      return backgroundChatIframe;
+    }
+
+    console.log('[Flow Chat Watch] Creating background chat iframe for video:', videoId);
+
+    // Create hidden container for background chat iframe
+    const container = document.createElement('div');
+    container.className = 'flow-chat-bg-container';
+    container.dataset.videoId = videoId;
+    container.style.display = 'none'; // Always hidden
+
+    // Create iframe for chat (background only, for reading messages)
+    const baseUrl = window.location.hostname;
+    const isLive = checkIfVideoIsLive();
+    console.log('[Flow Chat Watch] Video is', isLive ? 'LIVE' : 'ARCHIVE');
+
+    // Add flow_chat_bg=true parameter so chat-observer.js can detect and monitor this iframe
+    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
+    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = isLive ? liveUrl : replayUrl;
+    iframe.className = 'flow-chat-bg-iframe';
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.setAttribute('data-video-id', videoId);
+
+    console.log('[Flow Chat Watch] Background chat iframe URL:', iframe.src);
+
+    // Store iframe reference
+    backgroundChatIframe = iframe;
+
+    container.appendChild(iframe);
+    document.body.appendChild(container);
+
+    // If not live, try switching to live URL after 5 seconds
+    if (!isLive) {
+      setTimeout(() => {
+        if (checkIfVideoIsLive()) {
+          console.log('[Flow Chat Watch] Switching to live URL');
+          iframe.src = liveUrl;
+        }
+      }, 5000);
+    }
+
+    return iframe;
   }
 
   // Create flow container overlay on video
@@ -166,27 +209,6 @@
     return flowDiv;
   }
 
-  // Mark existing chat iframe to enable flow chat observation
-  function enableChatObservation(iframe) {
-    if (!iframe) {
-      console.log('[Flow Chat Watch] No iframe to enable observation on');
-      return;
-    }
-
-    console.log('[Flow Chat Watch] Enabling chat observation on iframe');
-    console.log('[Flow Chat Watch] Current src:', iframe.src);
-
-    // Add flow_chat parameter to iframe URL if not already present
-    const currentSrc = iframe.src;
-    if (!currentSrc.includes('flow_chat=true')) {
-      const separator = currentSrc.includes('?') ? '&' : '?';
-      const newSrc = currentSrc + separator + 'flow_chat=true';
-      console.log('[Flow Chat Watch] Setting new src:', newSrc);
-      iframe.src = newSrc;
-    } else {
-      console.log('[Flow Chat Watch] flow_chat=true already present in iframe src');
-    }
-  }
 
   // Create per-video toggle button
   function createToggleButton() {
@@ -733,31 +755,6 @@
     // Update any global styles based on settings
   }
 
-  // Watch for chat iframe to appear
-  function watchForChatIframe() {
-    const checkForChat = () => {
-      if (!chatIframe) {
-        const iframe = findChatIframe();
-        if (iframe) {
-          chatIframe = iframe;
-          enableChatObservation(iframe);
-        }
-      }
-    };
-
-    // Check periodically
-    setInterval(checkForChat, 2000);
-
-    // Also watch for DOM changes
-    const observer = new MutationObserver(() => {
-      checkForChat();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
 
   // Initialize extension
   function init() {
@@ -798,18 +795,10 @@
       createToggleButton();
       console.log('[Flow Chat Watch] Toggle button created');
 
-      // Look for existing chat iframe
+      // Create background chat iframe for fetching messages
       setTimeout(() => {
-        console.log('[Flow Chat Watch] Looking for chat iframe after 2s delay...');
-        chatIframe = findChatIframe();
-        if (chatIframe) {
-          enableChatObservation(chatIframe);
-        } else {
-          console.log('[Flow Chat Watch] No chat iframe found yet');
-        }
-
-        // Watch for chat iframe to appear (in case it loads later)
-        watchForChatIframe();
+        console.log('[Flow Chat Watch] Creating background chat iframe after 2s delay...');
+        createBackgroundChatIframe();
       }, 2000);
     } else {
       console.log('[Flow Chat Watch] Video container not found, retrying in 2s');
