@@ -527,51 +527,83 @@
 
   // Find chat iframe for a video (for archive support)
   function findChatIframeForVideo(videoId) {
+    console.log('[Flow Chat Multiview] Looking for chat iframe for video:', videoId);
     // Look for YouTube live chat iframes in cells
     const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
+    console.log('[Flow Chat Multiview] Found', chatIframes.length, 'chat iframes');
 
     for (const iframe of chatIframes) {
+      console.log('[Flow Chat Multiview] Checking iframe src:', iframe.src);
+
       // Skip if this is already a flow_chat_bg iframe
       if (iframe.src.includes('flow_chat_bg=true')) {
+        console.log('[Flow Chat Multiview] Skipping flow_chat_bg iframe');
         continue;
       }
 
       const iframeSrc = iframe.src;
       const iframeVideoId = extractVideoId(iframeSrc);
+      console.log('[Flow Chat Multiview] Iframe video ID:', iframeVideoId);
 
       if (iframeVideoId === videoId) {
+        console.log('[Flow Chat Multiview] Found matching chat iframe for video:', videoId);
         return iframe;
       }
     }
 
+    console.log('[Flow Chat Multiview] No matching chat iframe found for video:', videoId);
     return null;
   }
 
   // Enable chat observation on existing chat iframe
   function enableChatObservationOnIframe(iframe, videoId) {
-    if (!iframe || backgroundChatIframes.has(videoId)) return;
+    console.log('[Flow Chat Multiview] enableChatObservationOnIframe called for video:', videoId);
+
+    if (!iframe) {
+      console.log('[Flow Chat Multiview] No iframe provided');
+      return;
+    }
+
+    if (backgroundChatIframes.has(videoId)) {
+      console.log('[Flow Chat Multiview] Already have chat iframe for video:', videoId);
+      return;
+    }
+
+    console.log('[Flow Chat Multiview] Enabling observation on iframe');
+    console.log('[Flow Chat Multiview] Current src:', iframe.src);
 
     // Add flow_chat_bg parameter to existing iframe URL
     const currentSrc = iframe.src;
     if (!currentSrc.includes('flow_chat_bg=true')) {
       const separator = currentSrc.includes('?') ? '&' : '?';
-      iframe.src = currentSrc + separator + 'flow_chat_bg=true';
+      const newSrc = currentSrc + separator + 'flow_chat_bg=true';
+      console.log('[Flow Chat Multiview] Setting new src:', newSrc);
+      iframe.src = newSrc;
+    } else {
+      console.log('[Flow Chat Multiview] flow_chat_bg=true already present');
     }
 
     // Store this iframe as the chat source
     backgroundChatIframes.set(videoId, iframe);
+    console.log('[Flow Chat Multiview] Stored iframe for video:', videoId);
 
     // Create per-video toggle button
     const cell = videoCells.get(videoId);
     if (cell) {
+      console.log('[Flow Chat Multiview] Creating toggle button for video:', videoId);
       createPerVideoToggle(videoId, cell);
+    } else {
+      console.log('[Flow Chat Multiview] No cell found for video:', videoId);
     }
   }
 
   // Detect and register videos on the page
   function detectAndRegisterVideos() {
+    console.log('[Flow Chat Multiview] detectAndRegisterVideos called');
+
     // Pattern 1: YouTube embed iframes
     const iframes = document.querySelectorAll('iframe[src*="youtube.com/embed"]');
+    console.log('[Flow Chat Multiview] Found', iframes.length, 'YouTube embed iframes');
 
     iframes.forEach((iframe) => {
       const videoId = extractVideoId(iframe.src);

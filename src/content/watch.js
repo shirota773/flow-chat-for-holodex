@@ -80,11 +80,14 @@
   // Get video ID from current page URL
   function getVideoIdFromPage() {
     const url = window.location.href;
-    return extractVideoId(url);
+    const id = extractVideoId(url);
+    console.log('[Flow Chat Watch] Video ID from page:', id);
+    return id;
   }
 
   // Find the video container (where we'll overlay the flow chat)
   function findVideoContainer() {
+    console.log('[Flow Chat Watch] Finding video container...');
     // Look for the main video player area in Holodex watch page
     const selectors = [
       '.v-responsive', // Vuetify responsive container
@@ -96,33 +99,47 @@
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
+        console.log('[Flow Chat Watch] Found video container with selector:', selector);
         // If it's an iframe, get its parent container
         if (element.tagName === 'IFRAME') {
-          return element.closest('.v-responsive') || element.parentElement;
+          const container = element.closest('.v-responsive') || element.parentElement;
+          console.log('[Flow Chat Watch] Video container (from iframe parent):', container);
+          return container;
         }
+        console.log('[Flow Chat Watch] Video container:', element);
         return element;
       }
     }
 
+    console.log('[Flow Chat Watch] No video container found');
     return null;
   }
 
   // Find existing YouTube chat iframe on the page
   function findChatIframe() {
+    console.log('[Flow Chat Watch] Looking for chat iframe, target videoId:', videoId);
     const iframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
+    console.log('[Flow Chat Watch] Found', iframes.length, 'YouTube chat iframes');
 
     for (const iframe of iframes) {
+      console.log('[Flow Chat Watch] Checking iframe src:', iframe.src);
+
       // Skip if this is a flow_chat_bg iframe
       if (iframe.src.includes('flow_chat_bg=true')) {
+        console.log('[Flow Chat Watch] Skipping flow_chat_bg iframe');
         continue;
       }
 
       const srcVideoId = extractVideoId(iframe.src);
+      console.log('[Flow Chat Watch] Iframe video ID:', srcVideoId);
+
       if (srcVideoId === videoId || !videoId) {
+        console.log('[Flow Chat Watch] Found matching chat iframe!');
         return iframe;
       }
     }
 
+    console.log('[Flow Chat Watch] No matching chat iframe found');
     return null;
   }
 
@@ -151,13 +168,23 @@
 
   // Mark existing chat iframe to enable flow chat observation
   function enableChatObservation(iframe) {
-    if (!iframe) return;
+    if (!iframe) {
+      console.log('[Flow Chat Watch] No iframe to enable observation on');
+      return;
+    }
+
+    console.log('[Flow Chat Watch] Enabling chat observation on iframe');
+    console.log('[Flow Chat Watch] Current src:', iframe.src);
 
     // Add flow_chat parameter to iframe URL if not already present
     const currentSrc = iframe.src;
     if (!currentSrc.includes('flow_chat=true')) {
       const separator = currentSrc.includes('?') ? '&' : '?';
-      iframe.src = currentSrc + separator + 'flow_chat=true';
+      const newSrc = currentSrc + separator + 'flow_chat=true';
+      console.log('[Flow Chat Watch] Setting new src:', newSrc);
+      iframe.src = newSrc;
+    } else {
+      console.log('[Flow Chat Watch] flow_chat=true already present in iframe src');
     }
   }
 
@@ -424,10 +451,16 @@
     const { type, data } = event.data;
 
     if (type === 'FLOW_CHAT_MESSAGE' && data) {
+      console.log('[Flow Chat Watch] Received chat message:', data);
       // Only process if video IDs match or if no video ID in data
       if (!data.videoId || data.videoId === videoId) {
+        console.log('[Flow Chat Watch] Creating flow message');
         createFlowMessage(data);
+      } else {
+        console.log('[Flow Chat Watch] Video ID mismatch. Expected:', videoId, 'Got:', data.videoId);
       }
+    } else if (type === 'FLOW_CHAT_READY') {
+      console.log('[Flow Chat Watch] Received FLOW_CHAT_READY');
     }
   }
 
@@ -728,12 +761,16 @@
 
   // Initialize extension
   function init() {
+    console.log('[Flow Chat Watch] Initializing...');
+    console.log('[Flow Chat Watch] Current URL:', window.location.href);
+
     loadSettings();
     createGlobalToggleButton();
     createControlPanel();
 
     // Listen for messages from chat iframes
     window.addEventListener('message', handleChatMessage);
+    console.log('[Flow Chat Watch] Message listener added');
 
     // Listen for clicks outside control panel
     document.addEventListener('click', handleOutsideClick);
@@ -741,27 +778,41 @@
     // Get video ID from page
     videoId = getVideoIdFromPage();
 
+    if (!videoId) {
+      console.log('[Flow Chat Watch] No video ID found, retrying in 2s');
+      setTimeout(init, 2000);
+      return;
+    }
+
     // Find video container
     videoContainer = findVideoContainer();
 
     if (videoContainer) {
+      console.log('[Flow Chat Watch] Video container found, setting up...');
+
       // Create flow container
       createFlowContainer(videoContainer);
+      console.log('[Flow Chat Watch] Flow container created');
 
       // Create toggle button
       createToggleButton();
+      console.log('[Flow Chat Watch] Toggle button created');
 
       // Look for existing chat iframe
       setTimeout(() => {
+        console.log('[Flow Chat Watch] Looking for chat iframe after 2s delay...');
         chatIframe = findChatIframe();
         if (chatIframe) {
           enableChatObservation(chatIframe);
+        } else {
+          console.log('[Flow Chat Watch] No chat iframe found yet');
         }
 
         // Watch for chat iframe to appear (in case it loads later)
         watchForChatIframe();
       }, 2000);
     } else {
+      console.log('[Flow Chat Watch] Video container not found, retrying in 2s');
       // Retry finding video container
       setTimeout(init, 2000);
     }

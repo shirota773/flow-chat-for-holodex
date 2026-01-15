@@ -9,10 +9,18 @@
   const isBackgroundChat = urlParams.get('flow_chat_bg') === 'true';
   const isWatchChat = urlParams.get('flow_chat') === 'true';
 
+  console.log('[Flow Chat Observer] URL params check:');
+  console.log('[Flow Chat Observer] Current URL:', window.location.href);
+  console.log('[Flow Chat Observer] isBackgroundChat:', isBackgroundChat);
+  console.log('[Flow Chat Observer] isWatchChat:', isWatchChat);
+
   // Only run in Flow Chat enabled iframes (background or watch page)
   if (!isBackgroundChat && !isWatchChat) {
+    console.log('[Flow Chat Observer] Not a Flow Chat enabled iframe, exiting');
     return;
   }
+
+  console.log('[Flow Chat Observer] Flow Chat enabled, initializing observer');
 
   let observer = null;
   let isEnabled = true;
@@ -121,15 +129,26 @@
 
   // Send message to parent window (Holodex)
   function sendToParent(chatData) {
-    if (!isEnabled || !chatData || !chatData.fragments || chatData.fragments.length === 0) return;
+    if (!isEnabled) {
+      console.log('[Flow Chat Observer] Not enabled, skipping message');
+      return;
+    }
+
+    if (!chatData || !chatData.fragments || chatData.fragments.length === 0) {
+      console.log('[Flow Chat Observer] Invalid chat data, skipping');
+      return;
+    }
+
+    console.log('[Flow Chat Observer] Sending message to parent:', chatData);
 
     try {
       window.parent.postMessage({
         type: 'FLOW_CHAT_MESSAGE',
         data: chatData
       }, 'https://holodex.net');
+      console.log('[Flow Chat Observer] Message sent successfully');
     } catch (e) {
-      // Silently fail
+      console.error('[Flow Chat Observer] Failed to send message:', e);
     }
   }
 
@@ -256,27 +275,35 @@ padding-left: 10px;
 
   // Process new chat messages
   function processChatMessages(elements) {
+    console.log('[Flow Chat Observer] Processing', elements.length, 'messages');
     elements.forEach(element => {
       // Apply custom classes to the element
       applyCustomClassesToElement(element);
 
       const chatData = parseChatMessage(element);
       if (chatData) {
+        console.log('[Flow Chat Observer] Parsed chat data:', chatData);
         sendToParent(chatData);
+      } else {
+        console.log('[Flow Chat Observer] Failed to parse message or already processed');
       }
     });
   }
 
   // Initialize MutationObserver
   function initObserver() {
+    console.log('[Flow Chat Observer] Initializing observer...');
     const chatContainer = document.querySelector('#items.yt-live-chat-item-list-renderer') ||
                           document.querySelector('yt-live-chat-item-list-renderer #items');
 
     if (!chatContainer) {
+      console.log('[Flow Chat Observer] Chat container not found, retrying in 1s');
       // Retry if container not found
       setTimeout(initObserver, 1000);
       return;
     }
+
+    console.log('[Flow Chat Observer] Chat container found:', chatContainer);
 
     observer = new MutationObserver((mutations) => {
       const newMessages = [];
@@ -341,18 +368,22 @@ padding-left: 10px;
 
   // Notify parent that chat observer is ready
   function notifyReady() {
+    const videoId = getVideoId();
+    console.log('[Flow Chat Observer] Notifying parent - Ready for video:', videoId);
     window.parent.postMessage({
       type: 'FLOW_CHAT_READY',
       data: {
-        videoId: getVideoId()
+        videoId: videoId
       }
     }, 'https://holodex.net');
   }
 
   // Initialize
   function init() {
+    console.log('[Flow Chat Observer] Starting initialization');
     // Inject custom styles
     injectCustomStyles();
+    console.log('[Flow Chat Observer] Custom styles injected');
 
     notifyReady();
     initObserver();
