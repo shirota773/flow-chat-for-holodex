@@ -293,11 +293,37 @@ padding-left: 10px;
   // Initialize MutationObserver
   function initObserver() {
     console.log('[Flow Chat Observer] Initializing observer...');
-    const chatContainer = document.querySelector('#items.yt-live-chat-item-list-renderer') ||
-                          document.querySelector('yt-live-chat-item-list-renderer #items');
+
+    // Try multiple selectors for chat container
+    const selectors = [
+      '#items.yt-live-chat-item-list-renderer',
+      'yt-live-chat-item-list-renderer #items',
+      '#item-list #items',
+      'yt-live-chat-renderer #items',
+      '#chat-messages #items',
+      '[role="list"]#items'
+    ];
+
+    let chatContainer = null;
+
+    for (const selector of selectors) {
+      console.log('[Flow Chat Observer] Trying selector:', selector);
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log('[Flow Chat Observer] Found container with selector:', selector);
+        chatContainer = element;
+        break;
+      }
+    }
 
     if (!chatContainer) {
-      console.log('[Flow Chat Observer] Chat container not found, retrying in 1s');
+      console.log('[Flow Chat Observer] Chat container not found with any selector, retrying in 1s');
+      console.log('[Flow Chat Observer] Available elements:', {
+        body: document.body ? 'present' : 'missing',
+        ytLiveChatRenderer: document.querySelector('yt-live-chat-renderer') ? 'present' : 'missing',
+        ytLiveChatItemList: document.querySelector('yt-live-chat-item-list-renderer') ? 'present' : 'missing',
+        anyItems: document.querySelector('[id="items"]') ? 'present' : 'missing'
+      });
       // Retry if container not found
       setTimeout(initObserver, 1000);
       return;

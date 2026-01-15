@@ -118,8 +118,8 @@
   // Find existing YouTube chat iframe on the page
   function findChatIframe() {
     console.log('[Flow Chat Watch] Looking for chat iframe, target videoId:', videoId);
-    const iframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"]');
-    console.log('[Flow Chat Watch] Found', iframes.length, 'YouTube chat iframes');
+    const iframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
+    console.log('[Flow Chat Watch] Found', iframes.length, 'YouTube chat iframes (live + replay)');
 
     for (const iframe of iframes) {
       console.log('[Flow Chat Watch] Checking iframe src:', iframe.src);
