@@ -496,13 +496,30 @@
     return null;
   }
 
-  // Check if video is live or archived
+  // Check if video is live or archived (improved detection using chat iframe)
   function checkIfVideoIsLive(videoId) {
-    // Check iframe URLs for live indicators
+    // First, check if there's a chat iframe for this video
+    const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
+
+    for (const iframe of chatIframes) {
+      // Skip flow_chat_bg iframes
+      if (iframe.src.includes('flow_chat_bg=true')) continue;
+
+      const iframeVideoId = extractVideoId(iframe.src);
+      if (iframeVideoId === videoId) {
+        // Found chat iframe for this video - check if it's replay
+        const isReplay = iframe.src.includes('live_chat_replay');
+        console.log('[Flow Chat Multiview] Chat iframe detected:', isReplay ? 'REPLAY (Archive)' : 'LIVE');
+        return !isReplay; // If replay, it's archive (not live)
+      }
+    }
+
+    // Fallback: Check iframe URLs for live indicators
     const iframes = document.querySelectorAll('iframe[src*="youtube.com"]');
     for (const iframe of iframes) {
       const src = iframe.src;
       if (src.includes(videoId) && src.includes('/live/')) {
+        console.log('[Flow Chat Multiview] Video URL contains /live/ - detected as LIVE');
         return true;
       }
     }
@@ -512,6 +529,7 @@
     for (const element of videoElements) {
       const dataStatus = element.getAttribute('data-status');
       if (dataStatus === 'live' || element.classList.contains('live')) {
+        console.log('[Flow Chat Multiview] Data attribute indicates LIVE');
         return true;
       }
     }
@@ -519,9 +537,11 @@
     // Check for live badges
     const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="LiveBadge"]');
     if (liveBadges.length > 0) {
+      console.log('[Flow Chat Multiview] Live badge detected - LIVE');
       return true;
     }
 
+    console.log('[Flow Chat Multiview] No live indicators found - defaulting to ARCHIVE');
     return false;
   }
 
