@@ -4,8 +4,10 @@
 (function() {
   'use strict';
 
-  // Always run in YouTube chat iframes within Holodex
-  // No URL parameter check needed - messages are only sent to holodex.net
+  // Check if this iframe should inject custom styles
+  // Only background iframes (flow_chat_bg=true) should inject styles
+  const urlParams = new URLSearchParams(window.location.search);
+  const isBackgroundIframe = urlParams.get('flow_chat_bg') === 'true';
 
   let observer = null;
   let isEnabled = true;
@@ -115,23 +117,18 @@
   // Send message to parent window (Holodex)
   function sendToParent(chatData) {
     if (!isEnabled) {
-      console.log('[Flow Chat Observer] Not enabled, skipping message');
       return;
     }
 
     if (!chatData || !chatData.fragments || chatData.fragments.length === 0) {
-      console.log('[Flow Chat Observer] Invalid chat data, skipping');
       return;
     }
-
-    console.log('[Flow Chat Observer] Sending message to parent:', chatData);
 
     try {
       window.parent.postMessage({
         type: 'FLOW_CHAT_MESSAGE',
         data: chatData
       }, 'https://holodex.net');
-      console.log('[Flow Chat Observer] Message sent successfully');
     } catch (e) {
       console.error('[Flow Chat Observer] Failed to send message:', e);
     }
@@ -171,8 +168,13 @@
     }
   }
 
-  // Inject custom CSS styles into iframe
+  // Inject custom CSS styles into iframe (only for background iframes)
   function injectCustomStyles() {
+    // Only inject styles for background iframes to avoid breaking cell chat display
+    if (!isBackgroundIframe) {
+      return;
+    }
+
     // Check if style already exists
     if (document.querySelector('#flow-chat-custom-styles')) {
       return;
@@ -260,25 +262,19 @@ padding-left: 10px;
 
   // Process new chat messages
   function processChatMessages(elements) {
-    console.log('[Flow Chat Observer] Processing', elements.length, 'messages');
     elements.forEach(element => {
       // Apply custom classes to the element
       applyCustomClassesToElement(element);
 
       const chatData = parseChatMessage(element);
       if (chatData) {
-        console.log('[Flow Chat Observer] Parsed chat data:', chatData);
         sendToParent(chatData);
-      } else {
-        console.log('[Flow Chat Observer] Failed to parse message or already processed');
       }
     });
   }
 
   // Initialize MutationObserver
   function initObserver() {
-    console.log('[Flow Chat Observer] Initializing observer...');
-
     // Try multiple selectors for chat container
     const selectors = [
       '#items.yt-live-chat-item-list-renderer',
@@ -292,29 +288,18 @@ padding-left: 10px;
     let chatContainer = null;
 
     for (const selector of selectors) {
-      console.log('[Flow Chat Observer] Trying selector:', selector);
       const element = document.querySelector(selector);
       if (element) {
-        console.log('[Flow Chat Observer] Found container with selector:', selector);
         chatContainer = element;
         break;
       }
     }
 
     if (!chatContainer) {
-      console.log('[Flow Chat Observer] Chat container not found with any selector, retrying in 1s');
-      console.log('[Flow Chat Observer] Available elements:', {
-        body: document.body ? 'present' : 'missing',
-        ytLiveChatRenderer: document.querySelector('yt-live-chat-renderer') ? 'present' : 'missing',
-        ytLiveChatItemList: document.querySelector('yt-live-chat-item-list-renderer') ? 'present' : 'missing',
-        anyItems: document.querySelector('[id="items"]') ? 'present' : 'missing'
-      });
       // Retry if container not found
       setTimeout(initObserver, 1000);
       return;
     }
-
-    console.log('[Flow Chat Observer] Chat container found:', chatContainer);
 
     observer = new MutationObserver((mutations) => {
       const newMessages = [];
@@ -380,7 +365,6 @@ padding-left: 10px;
   // Notify parent that chat observer is ready
   function notifyReady() {
     const videoId = getVideoId();
-    console.log('[Flow Chat Observer] Notifying parent - Ready for video:', videoId);
     window.parent.postMessage({
       type: 'FLOW_CHAT_READY',
       data: {
@@ -391,10 +375,8 @@ padding-left: 10px;
 
   // Initialize
   function init() {
-    console.log('[Flow Chat Observer] Starting initialization');
-    // Inject custom styles
+    // Inject custom styles (only for background iframes)
     injectCustomStyles();
-    console.log('[Flow Chat Observer] Custom styles injected');
 
     notifyReady();
     initObserver();
