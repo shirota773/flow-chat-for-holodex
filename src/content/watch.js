@@ -13,6 +13,9 @@
     maxMessages: 100,
     displayArea: 1.0,
     minVerticalGap: 4,
+    // Settings button
+    showSettingsButton: false,
+    settingsButtonPosition: 'bottom-right',
     showOwner: true,
     showModerator: true,
     showMember: true,
@@ -53,6 +56,7 @@
     if (areaName === 'sync' && changes.flowChatSettings) {
       settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
       updateControlPanelUI();
+      createGlobalToggleButton(); // Recreate button with new settings
     }
   });
 
@@ -475,8 +479,19 @@
 
   // Create global toggle button
   function createGlobalToggleButton() {
+    // Remove existing button if any
+    const existingToggle = document.querySelector('.flow-chat-toggle');
+    if (existingToggle) {
+      existingToggle.remove();
+    }
+
+    // Only create button if showSettingsButton is enabled
+    if (!settings.showSettingsButton) {
+      return;
+    }
+
     const toggle = document.createElement('button');
-    toggle.className = 'flow-chat-toggle';
+    toggle.className = `flow-chat-toggle flow-chat-toggle-${settings.settingsButtonPosition}`;
     toggle.innerHTML = '💬';
     toggle.title = 'Flow Chat Settings';
 
@@ -578,6 +593,23 @@
         <input type="checkbox" id="flow-avatar-normal" ${settings.avatarNormal ? 'checked' : ''}>
       </label>
 
+      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Settings Button:</div>
+
+      <label>
+        <span>Show on Page</span>
+        <input type="checkbox" id="flow-show-settings-button" ${settings.showSettingsButton ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Position</span>
+        <select id="flow-settings-button-position">
+          <option value="top-left" ${settings.settingsButtonPosition === 'top-left' ? 'selected' : ''}>Top Left</option>
+          <option value="top-right" ${settings.settingsButtonPosition === 'top-right' ? 'selected' : ''}>Top Right</option>
+          <option value="bottom-left" ${settings.settingsButtonPosition === 'bottom-left' ? 'selected' : ''}>Bottom Left</option>
+          <option value="bottom-right" ${settings.settingsButtonPosition === 'bottom-right' ? 'selected' : ''}>Bottom Right</option>
+        </select>
+      </label>
+
       <button id="flow-clear" class="danger">Clear All Messages</button>
       <button id="flow-save">Save Settings</button>
     `;
@@ -650,6 +682,16 @@
       settings.avatarNormal = e.target.checked;
     });
 
+    panel.querySelector('#flow-show-settings-button').addEventListener('change', (e) => {
+      settings.showSettingsButton = e.target.checked;
+      createGlobalToggleButton(); // Recreate button with new settings
+    });
+
+    panel.querySelector('#flow-settings-button-position').addEventListener('change', (e) => {
+      settings.settingsButtonPosition = e.target.value;
+      createGlobalToggleButton(); // Recreate button with new position
+    });
+
     panel.querySelector('#flow-clear').addEventListener('click', () => {
       if (flowContainer) {
         flowContainer.innerHTML = '';
@@ -682,6 +724,8 @@
     const avatarModeratorEl = panel.querySelector('#flow-avatar-moderator');
     const avatarMemberEl = panel.querySelector('#flow-avatar-member');
     const avatarNormalEl = panel.querySelector('#flow-avatar-normal');
+    const showSettingsButtonEl = panel.querySelector('#flow-show-settings-button');
+    const settingsButtonPositionEl = panel.querySelector('#flow-settings-button-position');
 
     if (enabledEl) enabledEl.checked = settings.enabled;
     if (displayTimeEl) {
@@ -709,6 +753,8 @@
     if (avatarModeratorEl) avatarModeratorEl.checked = settings.avatarModerator;
     if (avatarMemberEl) avatarMemberEl.checked = settings.avatarMember;
     if (avatarNormalEl) avatarNormalEl.checked = settings.avatarNormal;
+    if (showSettingsButtonEl) showSettingsButtonEl.checked = settings.showSettingsButton;
+    if (settingsButtonPositionEl) settingsButtonPositionEl.value = settings.settingsButtonPosition;
   }
 
   function showControls() {

@@ -8,6 +8,8 @@ const defaultSettings = {
   maxMessages: 100, // increased from 50
   displayArea: 1.0,
   minVerticalGap: 4,
+  showSettingsButton: false,
+  settingsButtonPosition: 'bottom-right',
   showOwner: true,
   showModerator: true,
   showMember: true,
@@ -104,6 +106,8 @@ const elements = {
   maxMessagesValue: document.getElementById('maxMessages-value'),
   displayArea: document.getElementById('displayArea'),
   displayAreaValue: document.getElementById('displayArea-value'),
+  showSettingsButton: document.getElementById('showSettingsButton'),
+  settingsButtonPosition: document.getElementById('settingsButtonPosition'),
   showOwner: document.getElementById('showOwner'),
   showModerator: document.getElementById('showModerator'),
   showMember: document.getElementById('showMember'),
@@ -162,6 +166,8 @@ function updateUI() {
   elements.maxMessagesValue.textContent = `${currentSettings.maxMessages}`;
   elements.displayArea.value = currentSettings.displayArea;
   elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
+  elements.showSettingsButton.checked = currentSettings.showSettingsButton;
+  elements.settingsButtonPosition.value = currentSettings.settingsButtonPosition;
   elements.showOwner.checked = currentSettings.showOwner;
   elements.showModerator.checked = currentSettings.showModerator;
   elements.showMember.checked = currentSettings.showMember;
@@ -188,6 +194,8 @@ function saveSettings() {
     maxMessages: parseInt(elements.maxMessages.value),
     displayArea: parseFloat(elements.displayArea.value),
     minVerticalGap: currentSettings.minVerticalGap,
+    showSettingsButton: elements.showSettingsButton.checked,
+    settingsButtonPosition: elements.settingsButtonPosition.value,
     showOwner: elements.showOwner.checked,
     showModerator: elements.showModerator.checked,
     showMember: elements.showMember.checked,

@@ -153,8 +153,6 @@
 
 .flow-chat-toggle {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
   background: rgba(0, 0, 0, 0.8);
   border: none;
   border-radius: 50%;
@@ -171,6 +169,27 @@
 
 .flow-chat-toggle:hover {
   background: rgba(74, 144, 226, 0.9);
+}
+
+/* Position classes for settings button */
+.flow-chat-toggle-top-left {
+  top: 20px;
+  left: 20px;
+}
+
+.flow-chat-toggle-top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.flow-chat-toggle-bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.flow-chat-toggle-bottom-right {
+  bottom: 20px;
+  right: 20px;
 }
 
 /* Per-video flow chat toggle button */
