@@ -124,7 +124,18 @@
       return;
     }
 
+    // For multiview pages, only background iframes should send messages
+    // to prevent duplicate comments from cell chat iframes
     try {
+      const parentUrl = document.referrer || '';
+      const isMultiview = parentUrl.includes('holodex.net/multiview');
+
+      // On multiview, only send from background iframes (flow_chat_bg=true)
+      // On single view (watch/), send from all iframes
+      if (isMultiview && !isBackgroundIframe) {
+        return; // Skip sending from cell chat iframes on multiview
+      }
+
       window.parent.postMessage({
         type: 'FLOW_CHAT_MESSAGE',
         data: chatData
