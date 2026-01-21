@@ -13,6 +13,10 @@
   let isEnabled = true;
   let processedMessages = new Set();
 
+  // For non-background iframes, require explicit permission to send messages
+  // This prevents duplicate messages on multiview
+  let canSendMessages = isBackgroundIframe; // Background iframes can always send
+
   // Configuration
   const config = {
     maxProcessedCache: 1000,
@@ -124,18 +128,14 @@
       return;
     }
 
-    // For multiview pages, only background iframes should send messages
-    // to prevent duplicate comments from cell chat iframes
+    // Only send messages if explicitly allowed
+    // Background iframes (flow_chat_bg=true) can always send
+    // Other iframes need explicit permission from parent
+    if (!canSendMessages) {
+      return;
+    }
+
     try {
-      const parentUrl = document.referrer || '';
-      const isMultiview = parentUrl.includes('holodex.net/multiview');
-
-      // On multiview, only send from background iframes (flow_chat_bg=true)
-      // On single view (watch/), send from all iframes
-      if (isMultiview && !isBackgroundIframe) {
-        return; // Skip sending from cell chat iframes on multiview
-      }
-
       window.parent.postMessage({
         type: 'FLOW_CHAT_MESSAGE',
         data: chatData
@@ -351,15 +351,21 @@ padding-left: 10px;
 
   // Listen for control messages from parent
   window.addEventListener('message', (event) => {
-    if (event.origin !== 'https://holodex.net') return;
+    // Accept messages from Holodex pages
+    if (!event.origin.includes('holodex.net')) return;
 
-    if (event.data.type === 'FLOW_CHAT_CONTROL') {
+    if (event.data && event.data.type === 'FLOW_CHAT_CONTROL') {
       switch (event.data.action) {
         case 'enable':
           isEnabled = true;
           break;
         case 'disable':
           isEnabled = false;
+          break;
+        case 'allow_send':
+          // Allow this iframe to send messages (for single view mode)
+          canSendMessages = true;
+          console.log('[Flow Chat Observer] Message sending enabled for this iframe');
           break;
         case 'ping':
           window.parent.postMessage({

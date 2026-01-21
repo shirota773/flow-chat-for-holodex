@@ -161,6 +161,26 @@
     if (existingIframe) {
       console.log('[Flow Chat Watch] Using existing chat iframe');
       backgroundChatIframe = existingIframe;
+
+      // Send message to iframe to allow it to send chat messages
+      // (Single view mode needs explicit permission)
+      // Wait a bit to ensure iframe is ready
+      const sendAllowMessage = () => {
+        try {
+          existingIframe.contentWindow.postMessage({
+            type: 'FLOW_CHAT_CONTROL',
+            action: 'allow_send'
+          }, 'https://www.youtube.com');
+          console.log('[Flow Chat Watch] Sent allow_send message to iframe');
+        } catch (e) {
+          console.error('[Flow Chat Watch] Failed to send allow_send message:', e);
+        }
+      };
+
+      // Send immediately and retry after 1 second to ensure it's received
+      sendAllowMessage();
+      setTimeout(sendAllowMessage, 1000);
+
       return existingIframe;
     } else {
       console.log('[Flow Chat Watch] No existing chat iframe found, will retry...');
