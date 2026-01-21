@@ -13,6 +13,9 @@
     maxMessages: 100,
     displayArea: 1.0,
     minVerticalGap: 4,
+    // Settings button
+    showSettingsButton: false,
+    settingsButtonPosition: 'bottom-right',
     showOwner: true,
     showModerator: true,
     showMember: true,
@@ -53,6 +56,7 @@
     if (areaName === 'sync' && changes.flowChatSettings) {
       settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
       updateControlPanelUI();
+      createGlobalToggleButton(); // Recreate button with new settings
     }
   });
 
@@ -115,75 +119,53 @@
     return null;
   }
 
-  // Check if video is live or archived
-  function checkIfVideoIsLive() {
-    // Check page title or other indicators
-    // For now, we'll try to detect from URL patterns or page elements
-    // This is a simplified check - you might need to adjust based on Holodex's structure
-    const pageTitle = document.title.toLowerCase();
-    if (pageTitle.includes('live')) {
-      return true;
+  // Find existing chat iframe on the page
+  function findExistingChatIframe() {
+    console.log('[Flow Chat Watch] Searching for existing chat iframe...');
+
+    // Look for YouTube chat iframes (both live and replay)
+    const chatIframes = document.querySelectorAll('iframe[src*="youtube.com/live_chat"], iframe[src*="youtube.com/live_chat_replay"]');
+
+    console.log('[Flow Chat Watch] Found', chatIframes.length, 'chat iframes');
+
+    for (const iframe of chatIframes) {
+      const iframeSrc = iframe.src || '';
+      console.log('[Flow Chat Watch] Checking iframe with src:', iframeSrc);
+
+      // Check if this iframe is for our video
+      const iframeVideoId = extractVideoId(iframeSrc);
+      console.log('[Flow Chat Watch] Iframe video ID:', iframeVideoId, 'Expected:', videoId);
+
+      if (iframeVideoId === videoId) {
+        console.log('[Flow Chat Watch] Found matching chat iframe!');
+        return iframe;
+      }
     }
 
-    // Check for live badges on the page
-    const liveBadges = document.querySelectorAll('.badge-live, .live-badge, [class*="live"]');
-    if (liveBadges.length > 0) {
-      return true;
-    }
-
-    // Default to false (archive) - safer assumption
-    return false;
+    console.log('[Flow Chat Watch] No matching chat iframe found');
+    return null;
   }
 
-  // Create background chat iframe for fetching messages
-  function createBackgroundChatIframe() {
+  // Setup existing chat iframe (no need to create a new one)
+  function setupExistingChatIframe() {
     if (backgroundChatIframe) {
-      console.log('[Flow Chat Watch] Background chat iframe already exists');
+      console.log('[Flow Chat Watch] Chat iframe already set up');
       return backgroundChatIframe;
     }
 
-    console.log('[Flow Chat Watch] Creating background chat iframe for video:', videoId);
+    console.log('[Flow Chat Watch] Setting up existing chat iframe for video:', videoId);
 
-    // Create hidden container for background chat iframe
-    const container = document.createElement('div');
-    container.className = 'flow-chat-bg-container';
-    container.dataset.videoId = videoId;
-    container.style.display = 'none'; // Always hidden
+    // Find existing chat iframe on the page
+    const existingIframe = findExistingChatIframe();
 
-    // Create iframe for chat (background only, for reading messages)
-    const baseUrl = window.location.hostname;
-    const isLive = checkIfVideoIsLive();
-    console.log('[Flow Chat Watch] Video is', isLive ? 'LIVE' : 'ARCHIVE');
-
-    // Add flow_chat_bg=true parameter so chat-observer.js can detect and monitor this iframe
-    const replayUrl = `https://www.youtube.com/live_chat_replay?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-    const liveUrl = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${baseUrl}&flow_chat_bg=true`;
-
-    const iframe = document.createElement('iframe');
-    iframe.src = isLive ? liveUrl : replayUrl;
-    iframe.className = 'flow-chat-bg-iframe';
-    iframe.allow = 'autoplay; encrypted-media';
-    iframe.setAttribute('data-video-id', videoId);
-
-    console.log('[Flow Chat Watch] Background chat iframe URL:', iframe.src);
-
-    // Store iframe reference
-    backgroundChatIframe = iframe;
-
-    container.appendChild(iframe);
-    document.body.appendChild(container);
-
-    // If not live, try switching to live URL after 5 seconds
-    if (!isLive) {
-      setTimeout(() => {
-        if (checkIfVideoIsLive()) {
-          console.log('[Flow Chat Watch] Switching to live URL');
-          iframe.src = liveUrl;
-        }
-      }, 5000);
+    if (existingIframe) {
+      console.log('[Flow Chat Watch] Using existing chat iframe');
+      backgroundChatIframe = existingIframe;
+      return existingIframe;
+    } else {
+      console.log('[Flow Chat Watch] No existing chat iframe found, will retry...');
+      return null;
     }
-
-    return iframe;
   }
 
   // Create flow container overlay on video
@@ -215,7 +197,7 @@
     if (!videoContainer) return;
 
     const toggle = document.createElement('button');
-    toggle.className = 'flow-chat-video-toggle visible';
+    toggle.className = 'flow-chat-video-toggle';
     toggle.dataset.videoId = videoId;
     toggle.title = 'Toggle Flow Chat';
 
@@ -232,6 +214,15 @@
       if (flowContainer) {
         flowContainer.style.display = flowEnabled ? 'block' : 'none';
       }
+    });
+
+    // Add hover listeners to video container for showing/hiding toggle button
+    videoContainer.addEventListener('mouseenter', () => {
+      toggle.classList.add('visible');
+    });
+
+    videoContainer.addEventListener('mouseleave', () => {
+      toggle.classList.remove('visible');
     });
 
     videoContainer.appendChild(toggle);
@@ -488,8 +479,19 @@
 
   // Create global toggle button
   function createGlobalToggleButton() {
+    // Remove existing button if any
+    const existingToggle = document.querySelector('.flow-chat-toggle');
+    if (existingToggle) {
+      existingToggle.remove();
+    }
+
+    // Only create button if showSettingsButton is enabled
+    if (!settings.showSettingsButton) {
+      return;
+    }
+
     const toggle = document.createElement('button');
-    toggle.className = 'flow-chat-toggle';
+    toggle.className = `flow-chat-toggle flow-chat-toggle-${settings.settingsButtonPosition}`;
     toggle.innerHTML = '💬';
     toggle.title = 'Flow Chat Settings';
 
@@ -591,6 +593,23 @@
         <input type="checkbox" id="flow-avatar-normal" ${settings.avatarNormal ? 'checked' : ''}>
       </label>
 
+      <div style="margin: 8px 0; font-size: 12px; opacity: 0.8;">Settings Button:</div>
+
+      <label>
+        <span>Show on Page</span>
+        <input type="checkbox" id="flow-show-settings-button" ${settings.showSettingsButton ? 'checked' : ''}>
+      </label>
+
+      <label>
+        <span>Position</span>
+        <select id="flow-settings-button-position">
+          <option value="top-left" ${settings.settingsButtonPosition === 'top-left' ? 'selected' : ''}>Top Left</option>
+          <option value="top-right" ${settings.settingsButtonPosition === 'top-right' ? 'selected' : ''}>Top Right</option>
+          <option value="bottom-left" ${settings.settingsButtonPosition === 'bottom-left' ? 'selected' : ''}>Bottom Left</option>
+          <option value="bottom-right" ${settings.settingsButtonPosition === 'bottom-right' ? 'selected' : ''}>Bottom Right</option>
+        </select>
+      </label>
+
       <button id="flow-clear" class="danger">Clear All Messages</button>
       <button id="flow-save">Save Settings</button>
     `;
@@ -663,6 +682,16 @@
       settings.avatarNormal = e.target.checked;
     });
 
+    panel.querySelector('#flow-show-settings-button').addEventListener('change', (e) => {
+      settings.showSettingsButton = e.target.checked;
+      createGlobalToggleButton(); // Recreate button with new settings
+    });
+
+    panel.querySelector('#flow-settings-button-position').addEventListener('change', (e) => {
+      settings.settingsButtonPosition = e.target.value;
+      createGlobalToggleButton(); // Recreate button with new position
+    });
+
     panel.querySelector('#flow-clear').addEventListener('click', () => {
       if (flowContainer) {
         flowContainer.innerHTML = '';
@@ -695,6 +724,8 @@
     const avatarModeratorEl = panel.querySelector('#flow-avatar-moderator');
     const avatarMemberEl = panel.querySelector('#flow-avatar-member');
     const avatarNormalEl = panel.querySelector('#flow-avatar-normal');
+    const showSettingsButtonEl = panel.querySelector('#flow-show-settings-button');
+    const settingsButtonPositionEl = panel.querySelector('#flow-settings-button-position');
 
     if (enabledEl) enabledEl.checked = settings.enabled;
     if (displayTimeEl) {
@@ -722,6 +753,8 @@
     if (avatarModeratorEl) avatarModeratorEl.checked = settings.avatarModerator;
     if (avatarMemberEl) avatarMemberEl.checked = settings.avatarMember;
     if (avatarNormalEl) avatarNormalEl.checked = settings.avatarNormal;
+    if (showSettingsButtonEl) showSettingsButtonEl.checked = settings.showSettingsButton;
+    if (settingsButtonPositionEl) settingsButtonPositionEl.value = settings.settingsButtonPosition;
   }
 
   function showControls() {
@@ -755,6 +788,45 @@
     // Update any global styles based on settings
   }
 
+  // Watch for new chat iframes being added to the page
+  function watchForChatIframe() {
+    console.log('[Flow Chat Watch] Starting to watch for chat iframe changes...');
+
+    const observer = new MutationObserver((mutations) => {
+      // If we already have a chat iframe, no need to check
+      if (backgroundChatIframe) return;
+
+      mutations.forEach(mutation => {
+        if (mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check if this is a YouTube chat iframe
+              if (node.tagName === 'IFRAME' &&
+                  node.src &&
+                  (node.src.includes('youtube.com/live_chat') || node.src.includes('youtube.com/live_chat_replay'))) {
+                console.log('[Flow Chat Watch] New chat iframe detected!');
+                setupExistingChatIframe();
+              }
+              // Check if iframe was added inside this node
+              if (node.querySelector) {
+                const chatIframe = node.querySelector('iframe[src*="youtube.com/live_chat"]');
+                if (chatIframe) {
+                  console.log('[Flow Chat Watch] New chat iframe detected in added node!');
+                  setupExistingChatIframe();
+                }
+              }
+            }
+          });
+        }
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
 
   // Initialize extension
   function init() {
@@ -771,6 +843,9 @@
 
     // Listen for clicks outside control panel
     document.addEventListener('click', handleOutsideClick);
+
+    // Watch for chat iframe changes
+    watchForChatIframe();
 
     // Get video ID from page
     videoId = getVideoIdFromPage();
@@ -795,10 +870,29 @@
       createToggleButton();
       console.log('[Flow Chat Watch] Toggle button created');
 
-      // Create background chat iframe for fetching messages
+      // Setup existing chat iframe (single view always has a chat iframe)
       setTimeout(() => {
-        console.log('[Flow Chat Watch] Creating background chat iframe after 2s delay...');
-        createBackgroundChatIframe();
+        console.log('[Flow Chat Watch] Looking for existing chat iframe after 2s delay...');
+        const iframe = setupExistingChatIframe();
+
+        if (!iframe) {
+          console.log('[Flow Chat Watch] Chat iframe not found, retrying in 2s...');
+          // Retry finding chat iframe
+          setTimeout(() => {
+            const retryIframe = setupExistingChatIframe();
+            if (!retryIframe) {
+              console.log('[Flow Chat Watch] Still no chat iframe found, will retry again...');
+              // Keep retrying every 3 seconds
+              const retryInterval = setInterval(() => {
+                const finalIframe = setupExistingChatIframe();
+                if (finalIframe) {
+                  console.log('[Flow Chat Watch] Chat iframe found on retry!');
+                  clearInterval(retryInterval);
+                }
+              }, 3000);
+            }
+          }, 2000);
+        }
       }, 2000);
     } else {
       console.log('[Flow Chat Watch] Video container not found, retrying in 2s');
