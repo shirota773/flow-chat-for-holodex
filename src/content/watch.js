@@ -193,7 +193,7 @@
     if (!videoContainer) return;
 
     const toggle = document.createElement('button');
-    toggle.className = 'flow-chat-video-toggle visible';
+    toggle.className = 'flow-chat-video-toggle';
     toggle.dataset.videoId = videoId;
     toggle.title = 'Toggle Flow Chat';
 
@@ -210,6 +210,15 @@
       if (flowContainer) {
         flowContainer.style.display = flowEnabled ? 'block' : 'none';
       }
+    });
+
+    // Add hover listeners to video container for showing/hiding toggle button
+    videoContainer.addEventListener('mouseenter', () => {
+      toggle.classList.add('visible');
+    });
+
+    videoContainer.addEventListener('mouseleave', () => {
+      toggle.classList.remove('visible');
     });
 
     videoContainer.appendChild(toggle);
