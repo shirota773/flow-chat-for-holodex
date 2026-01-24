@@ -14,8 +14,17 @@
   let processedMessages = new Set();
 
   // For non-background iframes, require explicit permission to send messages
-  // This prevents duplicate messages on multiview
+  // This prevents duplicate messages on multiview livestreams
+  // - Livestreams on multiview: only background iframes send messages
+  // - Archives on multiview: page chat iframes send messages (after receiving allow_send)
+  // - Single view: page chat iframe sends messages (after receiving allow_send)
   let canSendMessages = isBackgroundIframe; // Background iframes can always send
+
+  console.log('[Flow Chat Observer] Initialized:', {
+    isBackgroundIframe,
+    canSendMessages,
+    videoId: new URLSearchParams(window.location.search).get('v')
+  });
 
   // Configuration
   const config = {
@@ -130,8 +139,9 @@
 
     // Only send messages if explicitly allowed
     // Background iframes (flow_chat_bg=true) can always send
-    // Other iframes need explicit permission from parent
+    // Other iframes need explicit permission from parent (via allow_send message)
     if (!canSendMessages) {
+      // Silently skip - this is expected for page chat iframes on livestreams
       return;
     }
 
@@ -363,9 +373,9 @@ padding-left: 10px;
           isEnabled = false;
           break;
         case 'allow_send':
-          // Allow this iframe to send messages (for single view mode)
+          // Allow this iframe to send messages (for archive videos and single view mode)
           canSendMessages = true;
-          console.log('[Flow Chat Observer] Message sending enabled for this iframe');
+          console.log('[Flow Chat Observer] Message sending enabled for this iframe (videoId:', getVideoId(), ')');
           break;
         case 'ping':
           window.parent.postMessage({

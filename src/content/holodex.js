@@ -557,7 +557,7 @@
     return null;
   }
 
-  // Enable chat observation on existing chat iframe
+  // Enable chat observation on existing chat iframe (for archive videos)
   // Does NOT modify iframe src - chat-observer runs automatically in all YouTube chat iframes
   function enableChatObservationOnIframe(iframe, videoId) {
     if (!iframe || backgroundChatIframes.has(videoId)) {
@@ -566,6 +566,18 @@
 
     // Store this iframe (no src modification needed)
     backgroundChatIframes.set(videoId, iframe);
+
+    // Send allow_send message to enable message sending from this iframe
+    // This is necessary for archive videos to send chat messages
+    try {
+      iframe.contentWindow.postMessage({
+        type: 'FLOW_CHAT_CONTROL',
+        action: 'allow_send'
+      }, 'https://www.youtube.com');
+      console.log('[Flow Chat] Sent allow_send to archive chat iframe for video:', videoId);
+    } catch (e) {
+      console.error('[Flow Chat] Failed to send allow_send message:', e);
+    }
 
     // Find or create the cell for this iframe
     const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
@@ -609,13 +621,15 @@
 
           if (isLive) {
             // Live stream: create background chat iframe
+            // Background iframe will have flow_chat_bg=true parameter
+            // Only background iframes can send messages by default
             createBackgroundChatIframe(videoId, cell);
           } else {
-            // Archive: find existing chat iframe
+            // Archive: find existing chat iframe on the page
             const existingChatIframe = findChatIframeForVideo(videoId);
 
             if (existingChatIframe) {
-              // Enable observation on existing iframe (no src modification)
+              // Enable observation on existing iframe and send allow_send message
               enableChatObservationOnIframe(existingChatIframe, videoId);
             }
           }
@@ -643,13 +657,15 @@
 
           if (isLive) {
             // Live stream: create background chat iframe
+            // Background iframe will have flow_chat_bg=true parameter
+            // Only background iframes can send messages by default
             createBackgroundChatIframe(videoId, cell);
           } else {
-            // Archive: find existing chat iframe
+            // Archive: find existing chat iframe on the page
             const existingChatIframe = findChatIframeForVideo(videoId);
 
             if (existingChatIframe) {
-              // Enable observation on existing iframe (no src modification)
+              // Enable observation on existing iframe and send allow_send message
               enableChatObservationOnIframe(existingChatIframe, videoId);
             }
           }
@@ -664,8 +680,14 @@
       const videoId = extractVideoId(iframe.src);
       if (!videoId) return;
 
-      // Skip if we already registered this video
-      if (backgroundChatIframes.has(videoId)) return;
+      // IMPORTANT: Skip if we already registered this video with a background iframe
+      // This prevents duplicate messages on livestreams
+      // Livestreams use background iframes (created in createBackgroundChatIframe)
+      // Archives use page chat iframes (this pattern)
+      if (backgroundChatIframes.has(videoId)) {
+        console.log('[Flow Chat] Skipping page chat iframe for video:', videoId, '(background iframe already exists)');
+        return;
+      }
 
       // This is an archive chat cell without a video - create flow for it
       const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
@@ -677,7 +699,7 @@
           createFlowContainer(cell, videoId);
         }
 
-        // Enable observation on this existing chat iframe (no src modification)
+        // Enable observation on this existing chat iframe (sends allow_send message)
         enableChatObservationOnIframe(iframe, videoId);
       }
     });
