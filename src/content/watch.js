@@ -167,18 +167,52 @@
     console.log('[Flow Chat Watch] Enabling message sending for page chat iframe');
     pageChatIframe = iframe;
 
-    // Send allow_send message to the iframe's chat-observer
-    // This allows the chat-observer in the iframe to send messages
-    try {
-      iframe.contentWindow.postMessage({
-        type: 'FLOW_CHAT_CONTROL',
-        action: 'allow_send'
-      }, 'https://www.youtube.com');
+    // Wait for iframe to be fully loaded before sending allow_send
+    // Send multiple times to ensure chat-observer receives it
+    const sendAllowSendMessage = () => {
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'FLOW_CHAT_CONTROL',
+          action: 'allow_send'
+        }, 'https://www.youtube.com');
+        console.log('[Flow Chat Watch] Sent allow_send message to chat iframe');
+      } catch (e) {
+        console.error('[Flow Chat Watch] Failed to send allow_send message:', e);
+      }
+    };
 
-      console.log('[Flow Chat Watch] Sent allow_send message to chat iframe');
-    } catch (e) {
-      console.error('[Flow Chat Watch] Failed to send allow_send message:', e);
-    }
+    // Check if iframe is already loaded
+    const checkAndSend = () => {
+      try {
+        // Try to access iframe content to check if it's loaded
+        if (iframe.contentWindow) {
+          // Send immediately
+          sendAllowSendMessage();
+
+          // Send again after delays to ensure chat-observer receives it
+          // chat-observer.js may take time to initialize
+          const retryDelays = [500, 1000, 2000, 3000, 5000];
+          retryDelays.forEach(delay => {
+            setTimeout(sendAllowSendMessage, delay);
+          });
+        }
+      } catch (e) {
+        console.log('[Flow Chat Watch] Iframe not ready yet, will retry');
+      }
+    };
+
+    // Start sending immediately
+    checkAndSend();
+
+    // Also listen for iframe load event
+    iframe.addEventListener('load', () => {
+      console.log('[Flow Chat Watch] Chat iframe loaded');
+      // Send multiple times after load
+      setTimeout(sendAllowSendMessage, 100);
+      setTimeout(sendAllowSendMessage, 500);
+      setTimeout(sendAllowSendMessage, 1000);
+      setTimeout(sendAllowSendMessage, 2000);
+    });
   }
 
   // Create flow container overlay on video
@@ -477,7 +511,7 @@
     const { type, data } = event.data;
 
     if (type === 'FLOW_CHAT_MESSAGE' && data) {
-      console.log('[Flow Chat Watch] Received chat message:', data);
+      console.log('[Flow Chat Watch] 📥 Received chat message:', data.author);
       // Only process if video IDs match or if no video ID in data
       if (!data.videoId || data.videoId === videoId) {
         console.log('[Flow Chat Watch] Creating flow message');
@@ -487,6 +521,8 @@
       }
     } else if (type === 'FLOW_CHAT_READY') {
       console.log('[Flow Chat Watch] Received FLOW_CHAT_READY');
+    } else if (type === 'FLOW_CHAT_OBSERVER_READY') {
+      console.log('[Flow Chat Watch] ✅ Chat observer ready for video:', data?.videoId, '(background:', data?.isBackgroundIframe, ')');
     }
   }
 

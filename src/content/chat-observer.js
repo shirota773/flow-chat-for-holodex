@@ -150,6 +150,7 @@
         type: 'FLOW_CHAT_MESSAGE',
         data: chatData
       }, 'https://holodex.net');
+      console.log('[Flow Chat Observer] 📤 Sent message:', chatData.author, '-', chatData.fragments.map(f => f.content || f.alt).join(''));
     } catch (e) {
       console.error('[Flow Chat Observer] Failed to send message:', e);
     }
@@ -362,20 +363,36 @@ padding-left: 10px;
   // Listen for control messages from parent
   window.addEventListener('message', (event) => {
     // Accept messages from Holodex pages
-    if (!event.origin.includes('holodex.net')) return;
+    if (!event.origin.includes('holodex.net')) {
+      // Log rejected messages for debugging
+      // console.log('[Flow Chat Observer] Rejected message from origin:', event.origin);
+      return;
+    }
+
+    console.log('[Flow Chat Observer] Received message:', event.data);
 
     if (event.data && event.data.type === 'FLOW_CHAT_CONTROL') {
+      console.log('[Flow Chat Observer] Processing control message:', event.data.action);
+
       switch (event.data.action) {
         case 'enable':
           isEnabled = true;
+          console.log('[Flow Chat Observer] Flow chat enabled');
           break;
         case 'disable':
           isEnabled = false;
+          console.log('[Flow Chat Observer] Flow chat disabled');
           break;
         case 'allow_send':
           // Allow this iframe to send messages (for archive videos and single view mode)
           canSendMessages = true;
-          console.log('[Flow Chat Observer] Message sending enabled for this iframe (videoId:', getVideoId(), ')');
+          console.log('[Flow Chat Observer] ✅ Message sending ENABLED for this iframe (videoId:', getVideoId(), ')');
+          // Send confirmation back to parent
+          window.parent.postMessage({
+            type: 'FLOW_CHAT_OBSERVER_READY',
+            videoId: getVideoId(),
+            isBackgroundIframe
+          }, 'https://holodex.net');
           break;
         case 'ping':
           window.parent.postMessage({
