@@ -284,6 +284,8 @@ padding-left: 10px;
 
   // Process new chat messages
   function processChatMessages(elements) {
+    console.log('[Flow Chat Observer] Processing', elements.length, 'chat messages (canSendMessages:', canSendMessages, ')');
+
     elements.forEach(element => {
       // Apply custom classes to the element
       applyCustomClassesToElement(element);
@@ -297,6 +299,8 @@ padding-left: 10px;
 
   // Initialize MutationObserver
   function initObserver() {
+    console.log('[Flow Chat Observer] Initializing MutationObserver for videoId:', getVideoId());
+
     // Try multiple selectors for chat container
     const selectors = [
       '#items.yt-live-chat-item-list-renderer',
@@ -313,12 +317,14 @@ padding-left: 10px;
       const element = document.querySelector(selector);
       if (element) {
         chatContainer = element;
+        console.log('[Flow Chat Observer] Found chat container with selector:', selector);
         break;
       }
     }
 
     if (!chatContainer) {
       // Retry if container not found
+      console.log('[Flow Chat Observer] Chat container not found, retrying in 1s...');
       setTimeout(initObserver, 1000);
       return;
     }
@@ -339,6 +345,7 @@ padding-left: 10px;
       });
 
       if (newMessages.length > 0) {
+        console.log('[Flow Chat Observer] 🔍 Detected', newMessages.length, 'new messages');
         processChatMessages(newMessages);
       }
     });
@@ -348,12 +355,16 @@ padding-left: 10px;
       subtree: false
     });
 
+    console.log('[Flow Chat Observer] ✅ MutationObserver started');
+
     // Process existing messages
     const existingMessages = chatContainer.querySelectorAll(
       'yt-live-chat-text-message-renderer, ' +
       'yt-live-chat-paid-message-renderer, ' +
       'yt-live-chat-paid-sticker-renderer'
     );
+
+    console.log('[Flow Chat Observer] Found', existingMessages.length, 'existing messages, processing last 5');
 
     // Only process last few messages to avoid spam
     const recentMessages = Array.from(existingMessages).slice(-5);

@@ -522,7 +522,8 @@
     } else if (type === 'FLOW_CHAT_READY') {
       console.log('[Flow Chat Watch] Received FLOW_CHAT_READY');
     } else if (type === 'FLOW_CHAT_OBSERVER_READY') {
-      console.log('[Flow Chat Watch] ✅ Chat observer ready for video:', data?.videoId, '(background:', data?.isBackgroundIframe, ')');
+      // Note: videoId and isBackgroundIframe are in event.data, not in data
+      console.log('[Flow Chat Watch] ✅ Chat observer ready for video:', event.data.videoId, '(background:', event.data.isBackgroundIframe, ')');
     }
   }
 

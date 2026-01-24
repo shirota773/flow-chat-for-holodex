@@ -466,7 +466,8 @@
         setupVideoCell(data.videoId);
       }
     } else if (type === 'FLOW_CHAT_OBSERVER_READY') {
-      console.log('[Flow Chat] ✅ Chat observer ready for video:', data?.videoId, '(background:', data?.isBackgroundIframe, ')');
+      // Note: videoId and isBackgroundIframe are in event.data, not in data
+      console.log('[Flow Chat] ✅ Chat observer ready for video:', event.data.videoId, '(background:', event.data.isBackgroundIframe, ')');
     }
   }
 
@@ -719,16 +720,21 @@
 
       console.log('[Flow Chat] Chat iframe found for video:', videoId, 'src:', iframe.src.substring(0, 100) + '...');
 
-      // IMPORTANT: Skip if we already registered this video with a background iframe
-      // This prevents duplicate messages on livestreams
-      // Livestreams use background iframes (created in createBackgroundChatIframe)
-      // Archives use page chat iframes (this pattern)
-      if (backgroundChatIframes.has(videoId)) {
-        console.log('[Flow Chat] Skipping page chat iframe for video:', videoId, '(background iframe already exists)');
+      // IMPORTANT: Skip if we already registered THIS EXACT iframe
+      // Check if this specific iframe object is already registered
+      if (backgroundChatIframes.has(videoId) && backgroundChatIframes.get(videoId) === iframe) {
+        console.log('[Flow Chat] Skipping already registered iframe for video:', videoId);
         return;
       }
 
-      // This is an archive chat cell without a video - create flow for it
+      // Skip if this is a background iframe (flow_chat_bg=true)
+      // Background iframes are for livestreams only
+      if (iframe.src.includes('flow_chat_bg=true')) {
+        console.log('[Flow Chat] Skipping background iframe for video:', videoId);
+        return;
+      }
+
+      // This is a page chat iframe - check if we should use it
       const cell = iframe.closest('.video-cell, [class*="cell"]') || iframe.parentElement;
 
       if (cell) {
@@ -741,6 +747,7 @@
         }
 
         // Enable observation on this existing chat iframe (sends allow_send message)
+        // This will register it in backgroundChatIframes if not already registered
         enableChatObservationOnIframe(iframe, videoId);
       } else {
         console.log('[Flow Chat] ⚠️ No cell found for chat iframe:', videoId);
