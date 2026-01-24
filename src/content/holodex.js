@@ -1082,6 +1082,7 @@
       let shouldReinitialize = false;
 
       mutations.forEach(mutation => {
+        // Check for added nodes
         if (mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === Node.ELEMENT_NODE) {
@@ -1101,21 +1102,75 @@
           });
         }
 
+        // Check for removed nodes (chat cells being switched)
+        // This helps detect when archive chat iframes are removed/replaced
+        if (mutation.removedNodes.length > 0) {
+          mutation.removedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check if removed node contains chat iframes (but NOT background iframes)
+              const chatIframes = node.querySelectorAll?.('iframe[src*="youtube.com/live_chat"]') || [];
+
+              chatIframes.forEach(iframe => {
+                // Skip background iframes
+                if (iframe.src.includes('flow_chat_bg=true')) {
+                  return;
+                }
+
+                // This is a page chat iframe being removed
+                const videoId = extractVideoId(iframe.src);
+                if (videoId) {
+                  console.log('[Flow Chat] Page chat iframe removed for video:', videoId);
+
+                  // Only clean up if this exact iframe was registered
+                  if (backgroundChatIframes.get(videoId) === iframe) {
+                    console.log('[Flow Chat] Cleaning up removed page chat iframe for video:', videoId);
+                    backgroundChatIframes.delete(videoId);
+                    detectedVideos.delete(videoId);
+                    shouldReinitialize = true;
+                  }
+                }
+              });
+
+              // Also check if the removed node itself is a chat iframe
+              if (node.tagName === 'IFRAME' && node.src?.includes('live_chat') && !node.src.includes('flow_chat_bg=true')) {
+                const videoId = extractVideoId(node.src);
+                if (videoId && backgroundChatIframes.get(videoId) === node) {
+                  console.log('[Flow Chat] Single page chat iframe removed for video:', videoId);
+                  backgroundChatIframes.delete(videoId);
+                  detectedVideos.delete(videoId);
+                  shouldReinitialize = true;
+                }
+              }
+            }
+          });
+        }
+
         // Check for attribute changes on iframes (for chat iframe switching)
         if (mutation.type === 'attributes' && mutation.target.tagName === 'IFRAME') {
           const iframe = mutation.target;
           if (iframe.src && (iframe.src.includes('live_chat') || iframe.src.includes('live_chat_replay'))) {
+            // Skip background iframes
+            if (iframe.src.includes('flow_chat_bg=true')) {
+              return;
+            }
+
             const newVideoId = extractVideoId(iframe.src);
 
             if (newVideoId) {
+              console.log('[Flow Chat] Page chat iframe src changed to video:', newVideoId);
+
               // Remove ALL old references to this iframe
               const toDelete = [];
               backgroundChatIframes.forEach((storedIframe, storedVideoId) => {
                 if (storedIframe === iframe) {
+                  console.log('[Flow Chat] Removing old reference for video:', storedVideoId);
                   toDelete.push(storedVideoId);
                 }
               });
-              toDelete.forEach(id => backgroundChatIframes.delete(id));
+              toDelete.forEach(id => {
+                backgroundChatIframes.delete(id);
+                detectedVideos.delete(id);
+              });
 
               // Trigger redetection immediately for this specific iframe
               shouldReinitialize = true;
