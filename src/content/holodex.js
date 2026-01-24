@@ -1,6 +1,10 @@
 // Flow Chat for Holodex - Main Content Script
 // Manages flow display on Holodex multiview page
 
+console.log('[Flow Chat] ========== holodex.js LOADED ==========');
+console.log('[Flow Chat] Current URL:', window.location.href);
+console.log('[Flow Chat] Document readyState:', document.readyState);
+
 (function() {
   'use strict';
 
@@ -1208,9 +1212,17 @@
 
   // Initialize extension
   function init() {
-    loadSettings();
-    createToggleButton();
-    createControlPanel();
+    console.log('[Flow Chat] ========== INIT CALLED ==========');
+    console.log('[Flow Chat] URL:', window.location.href);
+
+    try {
+      loadSettings();
+      createToggleButton();
+      createControlPanel();
+    } catch (e) {
+      console.error('[Flow Chat] ERROR in init setup:', e);
+      return;
+    }
 
     // Listen for messages from chat iframes
     window.addEventListener('message', handleChatMessage);
