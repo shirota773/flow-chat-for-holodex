@@ -1026,6 +1026,8 @@
 
   // Watch for DOM changes to detect new video cells and chat iframe changes
   function watchForNewCells() {
+    let reinitializeTimeout = null;
+
     const observer = new MutationObserver((mutations) => {
       let shouldReinitialize = false;
 
@@ -1073,7 +1075,16 @@
       });
 
       if (shouldReinitialize) {
-        setTimeout(detectAndRegisterVideos, 1000);
+        // Debounce: clear previous timeout and set a new one
+        // This prevents multiple rapid reinitializations
+        if (reinitializeTimeout) {
+          clearTimeout(reinitializeTimeout);
+        }
+        reinitializeTimeout = setTimeout(() => {
+          console.log('[Flow Chat] DOM changed, re-detecting videos...');
+          detectAndRegisterVideos();
+          reinitializeTimeout = null;
+        }, 500);
       }
     });
 
@@ -1102,11 +1113,21 @@
     // Listen for clicks outside the control panel to close it
     document.addEventListener('click', handleOutsideClick);
 
-    // Initial setup
+    // Initial setup with multiple retries to ensure detection
+    // Holodex loads content dynamically, so we need to retry multiple times
+    const initializationRetries = [1000, 3000, 5000, 8000];
+
+    initializationRetries.forEach((delay, index) => {
+      setTimeout(() => {
+        console.log(`[Flow Chat] Initialization attempt ${index + 1}/${initializationRetries.length}`);
+        initializeContainers();
+      }, delay);
+    });
+
+    // Start watching for new cells after first initialization
     setTimeout(() => {
-      initializeContainers();
       watchForNewCells();
-    }, 2000);
+    }, 1000);
   }
 
   // Start when page is ready

@@ -92,27 +92,44 @@
   // Find the video container (where we'll overlay the flow chat)
   function findVideoContainer() {
     console.log('[Flow Chat Watch] Finding video container...');
-    // Look for the main video player area in Holodex watch page
+
+    // PRIORITY 1: Find YouTube embed iframe first (most reliable)
+    const youtubeIframe = document.querySelector('iframe[src*="youtube.com/embed"]');
+    if (youtubeIframe) {
+      // Get the closest parent container that wraps the video
+      // Try to find .v-responsive that contains this specific iframe
+      const responsiveParent = youtubeIframe.closest('.v-responsive');
+      if (responsiveParent) {
+        console.log('[Flow Chat Watch] Found video container via YouTube iframe -> .v-responsive');
+        return responsiveParent;
+      }
+
+      // Otherwise use direct parent
+      const parent = youtubeIframe.parentElement;
+      console.log('[Flow Chat Watch] Found video container via YouTube iframe parent');
+      return parent;
+    }
+
+    // PRIORITY 2: Look for specific video-related containers
     const selectors = [
-      '.v-responsive', // Vuetify responsive container
       '[class*="video-container"]',
       '[class*="player-container"]',
-      'iframe[src*="youtube.com/embed"]'
+      '[class*="player-wrapper"]'
     ];
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
         console.log('[Flow Chat Watch] Found video container with selector:', selector);
-        // If it's an iframe, get its parent container
-        if (element.tagName === 'IFRAME') {
-          const container = element.closest('.v-responsive') || element.parentElement;
-          console.log('[Flow Chat Watch] Video container (from iframe parent):', container);
-          return container;
-        }
-        console.log('[Flow Chat Watch] Video container:', element);
         return element;
       }
+    }
+
+    // PRIORITY 3: Fallback to .v-responsive (only if nothing else found)
+    const responsive = document.querySelector('.v-responsive');
+    if (responsive) {
+      console.log('[Flow Chat Watch] Found video container with .v-responsive (fallback)');
+      return responsive;
     }
 
     console.log('[Flow Chat Watch] No video container found');
@@ -825,26 +842,27 @@
       createToggleButton();
       console.log('[Flow Chat Watch] Toggle button created');
 
-      // Find and enable page's existing chat iframe
-      setTimeout(() => {
-        console.log('[Flow Chat Watch] Looking for page chat iframe after 2s delay...');
-        const chatIframe = findPageChatIframe();
+      // Find and enable page's existing chat iframe with multiple retries
+      // Holodex loads chat iframe dynamically, so we need to retry
+      const chatIframeRetries = [1000, 3000, 5000, 8000];
 
-        if (chatIframe) {
-          enablePageChatIframe(chatIframe);
-        } else {
-          console.log('[Flow Chat Watch] No chat iframe found on page, will retry...');
-          // Retry after another 2 seconds
-          setTimeout(() => {
-            const retryIframe = findPageChatIframe();
-            if (retryIframe) {
-              enablePageChatIframe(retryIframe);
-            } else {
-              console.log('[Flow Chat Watch] Still no chat iframe found');
-            }
-          }, 2000);
-        }
-      }, 2000);
+      chatIframeRetries.forEach((delay, index) => {
+        setTimeout(() => {
+          // Skip if already found
+          if (pageChatIframe) {
+            return;
+          }
+
+          console.log(`[Flow Chat Watch] Looking for chat iframe (attempt ${index + 1}/${chatIframeRetries.length})...`);
+          const chatIframe = findPageChatIframe();
+
+          if (chatIframe) {
+            enablePageChatIframe(chatIframe);
+          } else {
+            console.log('[Flow Chat Watch] No chat iframe found yet');
+          }
+        }, delay);
+      });
     } else {
       console.log('[Flow Chat Watch] Video container not found, retrying in 2s');
       // Retry finding video container
