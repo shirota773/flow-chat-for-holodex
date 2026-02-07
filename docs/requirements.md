@@ -132,6 +132,7 @@ flow-chat-for-holodex/
 │   ├── background/
 │   │   └── service-worker.js       # バックグラウンドサービスワーカー
 │   ├── content/
+│   │   ├── shared.js               # 共通モジュール（FlowChatCore）
 │   │   ├── holodex.js              # Multiviewページ用コンテンツスクリプト
 │   │   ├── watch.js                # Watchページ用コンテンツスクリプト
 │   │   └── chat-observer.js        # YouTube Chat iframe内監視スクリプト
@@ -152,17 +153,21 @@ flow-chat-for-holodex/
 ┌─────────────────────────────────────────────────────────┐
 │ Holodex Page (holodex.net)                              │
 │                                                         │
-│  ┌──────────────────┐  ┌──────────────────┐            │
-│  │ holodex.js        │  │ watch.js          │            │
-│  │ (Multiview)       │  │ (Watch)           │            │
-│  │                   │  │                   │            │
-│  │ - 動画検出        │  │ - 動画検出        │            │
-│  │ - flowコンテナ管理│  │ - flowコンテナ管理│            │
-│  │ - BG iframe作成   │  │ - 既存iframe利用  │            │
-│  │ - メッセージ表示  │  │ - メッセージ表示  │            │
-│  │ - 衝突回避        │  │ - 衝突回避        │            │
-│  │ - 設定パネル      │  │ - 設定パネル      │            │
-│  └────────┬─────────┘  └────────┬─────────┘            │
+│  ┌──────────────────────────────────────────┐            │
+│  │ shared.js (FlowChatCore)                │            │
+│  │ - defaultSettings / 設定管理            │            │
+│  │ - renderFlowMessage / 衝突回避          │            │
+│  │ - 設定パネル / トグルボタン             │            │
+│  └────────────────────┬─────────────────────┘            │
+│                       │                                  │
+│  ┌──────────────────┐ │ ┌──────────────────┐            │
+│  │ holodex.js       │ │ │ watch.js         │            │
+│  │ (Multiview)      │ │ │ (Watch)          │            │
+│  │                  │ │ │                  │            │
+│  │ - 動画検出       │ │ │ - 動画検出       │            │
+│  │ - BG iframe管理  │ │ │ - 既存iframe利用 │            │
+│  │ - 個別ON/OFF     │ │ │ - メッセージ処理 │            │
+│  └────────┬─────────┘ │ └────────┬─────────┘            │
 │           │ postMessage          │ postMessage           │
 │  ┌────────┴──────────────────────┴─────────┐            │
 │  │ YouTube Chat iframes                     │            │
@@ -211,28 +216,47 @@ DOM要素削除 + activeMessages配列から除去
 
 ---
 
-## 4. 現状の課題と改善点
+## 4. 課題管理
 
-### 4.1 コードの重複 (Critical)
-- `holodex.js`と`watch.js`で以下の処理が完全に重複している
-  - `defaultSettings`定義
-  - `createFlowMessage()`（約80行）
-  - `wouldCollide()`（約45行）
-  - `findAvailablePosition()`（約30行）
-  - コントロールパネル生成・イベントリスナー（約200行）
-  - 設定の読み込み/保存/同期処理
-- **改善**: 共通モジュールに抽出して共有する
+| # | 重要度 | 課題 | 状態 | ブランチ |
+|---|--------|------|------|----------|
+| 4.1 | Critical | コードの重複 | **対策済** | `refactor/shared-module` |
+| 4.2 | Bug | Multiviewアーカイブ対応不足 | **対策済** | `fix/archive-bg-iframe` |
+| 4.3 | Bug | ライブ/アーカイブ判定の信頼性 | 未着手 | - |
+| 4.4 | Minor | defaultSettingsの不一致 | **対策済** | `fix/settings-mismatch` |
 
-### 4.2 Multiviewでのアーカイブ対応不足 (Bug)
-- ライブストリームではバックグラウンドiframeを自動作成するが、アーカイブでは既存チャットiframeがある場合のみ動作する
-- ユーザーがチャットcellを手動設置していないアーカイブ動画ではフローが機能しない
-- **改善**: アーカイブでもバックグラウンドiframe（`live_chat_replay`）を自動作成する
+### 4.1 コードの重複 (Critical) - 対策済
 
-### 4.3 ライブ/アーカイブ判定の信頼性 (Bug)
-- `checkIfVideoIsLive()`の判定がDOM要素に強く依存しており、Holodexのレイアウト変更で壊れやすい
-- ライブバッジの有無で判定している部分は、ページ上に複数動画がある場合に誤判定する可能性がある
-- **改善**: まず`live_chat`で試し、エラー/空の場合に`live_chat_replay`にフォールバックする方式を検討
+**問題**: `holodex.js`と`watch.js`で以下の処理が完全に重複していた（約1000行）
+- `defaultSettings`定義
+- `createFlowMessage()`（約80行）
+- `wouldCollide()`（約45行）
+- `findAvailablePosition()`（約30行）
+- コントロールパネル生成・イベントリスナー（約200行）
+- 設定の読み込み/保存/同期処理
 
-### 4.4 `defaultSettings`の不一致
-- `service-worker.js`の初期設定で`maxMessages: 50`だが、`holodex.js`/`watch.js`/`popup.js`では`maxMessages: 100`
-- **改善**: 一箇所で定義して参照する、または全て統一する
+**対策**: `src/content/shared.js`として共通モジュールを新規作成
+- `window.FlowChatCore`名前空間で共有APIを提供
+- `manifest.json`で`shared.js`を両content_scriptsの前に読み込むよう設定
+- `holodex.js`: 1097行 → 約240行（ページ固有ロジックのみ）
+- `watch.js`: 910行 → 約170行（ページ固有ロジックのみ）
+- 共通モジュール: 約330行（新規）
+- **総削減**: 約1000行
+
+### 4.2 Multiviewでのアーカイブ対応不足 (Bug) - 対策済
+
+**問題**: ライブストリームではバックグラウンドiframeを自動作成するが、アーカイブでは既存チャットiframeがある場合のみ動作。ユーザーがチャットcellを手動設置していないアーカイブ動画ではフローが機能しなかった。
+
+**対策**: `detectAndRegisterVideos()`のPattern 1/2/3すべてで、ライブ/アーカイブの区別なく`createBackgroundChatIframe()`を呼び出すよう統一。`createBackgroundChatIframe()`内部で`checkIfVideoIsLive()`の結果に応じて`/live_chat`または`/live_chat_replay`のURLを自動選択するため、呼び出し側での分岐が不要になった。不要になった`findChatIframeForVideo()`と`enableChatObservationOnIframe()`を削除。
+
+### 4.3 ライブ/アーカイブ判定の信頼性 (Bug) - 未着手
+
+**問題**: `checkIfVideoIsLive()`の判定がDOM要素に強く依存しており、Holodexのレイアウト変更で壊れやすい。ライブバッジの有無で判定している部分は、ページ上に複数動画がある場合に誤判定する可能性がある。
+
+**改善案**: まず`live_chat`で試し、エラー/空の場合に`live_chat_replay`にフォールバックする方式を検討。
+
+### 4.4 `defaultSettings`の不一致 (Minor) - 対策済
+
+**問題**: `service-worker.js`の初期設定で`maxMessages: 50`だが、他ファイルでは`maxMessages: 100`。また`showSettingsButton`と`settingsButtonPosition`が`service-worker.js`に存在しなかった。
+
+**対策**: `service-worker.js`の`maxMessages`を`100`に統一し、欠落していた`showSettingsButton: false`と`settingsButtonPosition: 'bottom-right'`を追加。
