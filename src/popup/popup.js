@@ -5,9 +5,11 @@ const defaultSettings = {
   displayTime: 8,
   fontSize: 28,
   opacity: 1.0,
-  maxMessages: 50,
+  maxMessages: 100, // increased from 50
   displayArea: 1.0,
   minVerticalGap: 4,
+  showSettingsButton: false,
+  settingsButtonPosition: 'bottom-right',
   showOwner: true,
   showModerator: true,
   showMember: true,
@@ -100,8 +102,12 @@ const elements = {
   fontSizeValue: document.getElementById('fontSize-value'),
   opacity: document.getElementById('opacity'),
   opacityValue: document.getElementById('opacity-value'),
+  maxMessages: document.getElementById('maxMessages'),
+  maxMessagesValue: document.getElementById('maxMessages-value'),
   displayArea: document.getElementById('displayArea'),
   displayAreaValue: document.getElementById('displayArea-value'),
+  showSettingsButton: document.getElementById('showSettingsButton'),
+  settingsButtonPosition: document.getElementById('settingsButtonPosition'),
   showOwner: document.getElementById('showOwner'),
   showModerator: document.getElementById('showModerator'),
   showMember: document.getElementById('showMember'),
@@ -156,8 +162,12 @@ function updateUI() {
   elements.fontSizeValue.textContent = `${currentSettings.fontSize}px`;
   elements.opacity.value = currentSettings.opacity;
   elements.opacityValue.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
+  elements.maxMessages.value = currentSettings.maxMessages;
+  elements.maxMessagesValue.textContent = `${currentSettings.maxMessages}`;
   elements.displayArea.value = currentSettings.displayArea;
   elements.displayAreaValue.textContent = `${Math.round(currentSettings.displayArea * 100)}%`;
+  elements.showSettingsButton.checked = currentSettings.showSettingsButton;
+  elements.settingsButtonPosition.value = currentSettings.settingsButtonPosition;
   elements.showOwner.checked = currentSettings.showOwner;
   elements.showModerator.checked = currentSettings.showModerator;
   elements.showMember.checked = currentSettings.showMember;
@@ -181,9 +191,11 @@ function saveSettings() {
     displayTime: parseInt(elements.displayTime.value),
     fontSize: parseInt(elements.fontSize.value),
     opacity: parseFloat(elements.opacity.value),
-    maxMessages: currentSettings.maxMessages,
+    maxMessages: parseInt(elements.maxMessages.value),
     displayArea: parseFloat(elements.displayArea.value),
     minVerticalGap: currentSettings.minVerticalGap,
+    showSettingsButton: elements.showSettingsButton.checked,
+    settingsButtonPosition: elements.settingsButtonPosition.value,
     showOwner: elements.showOwner.checked,
     showModerator: elements.showModerator.checked,
     showMember: elements.showMember.checked,
@@ -233,19 +245,16 @@ function showMessage(text, type) {
   }, 3000);
 }
 
-// Check if current tab is Holodex
+// Check if current tab is Holodex multiview
 function checkCurrentTab() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].url) {
       if (tabs[0].url.includes('holodex.net/multiview')) {
         elements.status.className = 'status active';
         elements.statusText.textContent = 'Active on Holodex Multiview';
-      } else if (tabs[0].url.includes('holodex.net/watch/')) {
-        elements.status.className = 'status active';
-        elements.statusText.textContent = 'Active on Holodex Watch';
       } else if (tabs[0].url.includes('holodex.net')) {
         elements.status.className = 'status inactive';
-        elements.statusText.textContent = 'Go to Multiview or Watch page';
+        elements.statusText.textContent = 'Go to Multiview to use';
       } else {
         elements.status.className = 'status inactive';
         elements.statusText.textContent = 'Not on Holodex';
@@ -360,6 +369,10 @@ elements.fontSize.addEventListener('input', (e) => {
 
 elements.opacity.addEventListener('input', (e) => {
   elements.opacityValue.textContent = `${Math.round(e.target.value * 100)}%`;
+});
+
+elements.maxMessages.addEventListener('input', (e) => {
+  elements.maxMessagesValue.textContent = `${e.target.value}`;
 });
 
 elements.displayArea.addEventListener('input', (e) => {

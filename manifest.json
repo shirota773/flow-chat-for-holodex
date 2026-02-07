@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Flow Chat for Holodex",
   "version": "1.0.0",
-  "description": "Display YouTube Live Chat messages as flowing text overlay on Holodex (multiview and watch pages)",
+  "description": "Display YouTube Live Chat messages as flowing text overlay on Holodex multiview",
   "permissions": [
     "storage",
     "activeTab"
@@ -13,16 +13,19 @@
   ],
   "content_scripts": [
     {
-      "matches": [
-        "https://holodex.net/multiview*",
-        "https://holodex.net/watch/*"
-      ],
+      "matches": ["https://holodex.net/multiview*"],
       "js": ["src/content/holodex.js"],
       "css": ["src/styles/flow.css"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.youtube.com/live_chat*"],
+      "matches": ["https://holodex.net/watch/*"],
+      "js": ["src/content/watch.js"],
+      "css": ["src/styles/flow.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/live_chat*", "https://www.youtube.com/live_chat_replay*"],
       "js": ["src/content/chat-observer.js"],
       "all_frames": true,
       "run_at": "document_idle"

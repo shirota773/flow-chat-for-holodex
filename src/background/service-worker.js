@@ -60,8 +60,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     if (tab.url.includes('holodex.net/multiview')) {
       console.log('[FlowChat] Holodex multiview detected');
-    } else if (tab.url.includes('holodex.net/watch/')) {
-      console.log('[FlowChat] Holodex watch page detected');
     }
   }
 });
