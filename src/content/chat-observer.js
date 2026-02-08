@@ -4,13 +4,21 @@
 (function() {
   'use strict';
 
+  // Skip if not in an iframe (running in a top-level tab)
+  if (window.self === window.top) {
+    return;
+  }
+
   // Check if this iframe should inject custom styles
   // Only background iframes (flow_chat_bg=true) should inject styles
   const urlParams = new URLSearchParams(window.location.search);
   const isBackgroundIframe = urlParams.get('flow_chat_bg') === 'true';
 
   let observer = null;
-  let isEnabled = true;
+  // BG iframes (flow_chat_bg=true) send immediately.
+  // Non-BG iframes wait for explicit ENABLE from parent (watch.js).
+  // This replaces the unreliable document.referrer-based multiview check.
+  let isEnabled = isBackgroundIframe;
   let processedMessages = new Set();
 
   // Configuration
@@ -114,6 +122,18 @@
     };
   }
 
+  // Send postMessage to Holodex page
+  // Holodex is always the top-level page, so use window.top.
+  // On watch pages the nesting is: holodex.net > youtube.com/embed > youtube.com/live_chat
+  // Using window.parent would target youtube.com/embed, causing a DOMException.
+  function postMessageToHolodex(message) {
+    try {
+      window.top.postMessage(message, 'https://holodex.net');
+    } catch (e) {
+      // Not running in Holodex context
+    }
+  }
+
   // Send message to parent window (Holodex)
   function sendToParent(chatData) {
     if (!isEnabled) {
@@ -124,25 +144,10 @@
       return;
     }
 
-    // For multiview pages, only background iframes should send messages
-    // to prevent duplicate comments from cell chat iframes
-    try {
-      const parentUrl = document.referrer || '';
-      const isMultiview = parentUrl.includes('holodex.net/multiview');
-
-      // On multiview, only send from background iframes (flow_chat_bg=true)
-      // On single view (watch/), send from all iframes
-      if (isMultiview && !isBackgroundIframe) {
-        return; // Skip sending from cell chat iframes on multiview
-      }
-
-      window.parent.postMessage({
-        type: 'FLOW_CHAT_MESSAGE',
-        data: chatData
-      }, 'https://holodex.net');
-    } catch (e) {
-      console.error('[Flow Chat Observer] Failed to send message:', e);
-    }
+    postMessageToHolodex({
+      type: 'FLOW_CHAT_MESSAGE',
+      data: chatData
+    });
   }
 
   // Apply custom classes to chat message elements
@@ -362,12 +367,12 @@ padding-left: 10px;
           isEnabled = false;
           break;
         case 'ping':
-          window.parent.postMessage({
+          postMessageToHolodex({
             type: 'FLOW_CHAT_PONG',
             data: {
               videoId: getVideoId()
             }
-          }, 'https://holodex.net');
+          });
           break;
       }
     }
@@ -376,12 +381,12 @@ padding-left: 10px;
   // Notify parent that chat observer is ready
   function notifyReady() {
     const videoId = getVideoId();
-    window.parent.postMessage({
+    postMessageToHolodex({
       type: 'FLOW_CHAT_READY',
       data: {
         videoId: videoId
       }
-    }, 'https://holodex.net');
+    });
   }
 
   // Initialize

@@ -13,14 +13,8 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://holodex.net/multiview*"],
-      "js": ["src/content/holodex.js"],
-      "css": ["src/styles/flow.css"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://holodex.net/watch/*"],
-      "js": ["src/content/watch.js"],
+      "matches": ["https://holodex.net/*"],
+      "js": ["src/content/holodex.js", "src/content/watch.js"],
       "css": ["src/styles/flow.css"],
       "run_at": "document_idle"
     },

@@ -12,7 +12,7 @@
     opacity: 1.0,
     maxMessages: 100,
     displayArea: 1.0,
-    minVerticalGap: 4,
+    minVerticalGap: 2,
     // Settings button
     showSettingsButton: false,
     settingsButtonPosition: 'bottom-right',
@@ -30,15 +30,24 @@
     colorNormal: { r: 255, g: 255, b: 255 }
   };
 
+  // Page type check - only activate on watch pages
+  function isWatchPage() {
+    return window.location.pathname.startsWith('/watch/');
+  }
+
   let settings = { ...defaultSettings };
   let flowContainer = null;
   let activeMessages = [];
   let messageCount = 0;
+  let animationRunning = false;
   let controlsVisible = false;
   let videoId = null;
   let backgroundChatIframe = null;
   let flowEnabled = true;
   let videoContainer = null;
+  let initialized = false;
+  let isActive = false; // Whether this script is currently active
+  let chatIframeObserver = null; // MutationObserver for detecting chat iframes
 
   // Load settings from storage
   function loadSettings() {
@@ -55,6 +64,7 @@
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'sync' && changes.flowChatSettings) {
       settings = { ...defaultSettings, ...changes.flowChatSettings.newValue };
+      if (!isActive) return; // Don't update UI when deactivated
       updateControlPanelUI();
       createGlobalToggleButton(); // Recreate button with new settings
     }
@@ -90,28 +100,28 @@
   }
 
   // Find the video container (where we'll overlay the flow chat)
+  // Holodex watch page structure:
+  //   .watch-layout > .left > div > div(position:relative) > .video(position:relative) > iframe
   function findVideoContainer() {
     console.log('[Flow Chat Watch] Finding video container...');
-    // Look for the main video player area in Holodex watch page
-    const selectors = [
-      '.v-responsive', // Vuetify responsive container
-      '[class*="video-container"]',
-      '[class*="player-container"]',
-      'iframe[src*="youtube.com/embed"]'
-    ];
 
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        console.log('[Flow Chat Watch] Found video container with selector:', selector);
-        // If it's an iframe, get its parent container
-        if (element.tagName === 'IFRAME') {
-          const container = element.closest('.v-responsive') || element.parentElement;
-          console.log('[Flow Chat Watch] Video container (from iframe parent):', container);
-          return container;
-        }
-        console.log('[Flow Chat Watch] Video container:', element);
-        return element;
+    // Primary: Holodex .video class (has position:relative and correct aspect ratio)
+    const videoDiv = document.querySelector('.video');
+    if (videoDiv && videoDiv.querySelector('iframe[src*="youtube.com"]')) {
+      console.log('[Flow Chat Watch] Found .video container');
+      return videoDiv;
+    }
+
+    // Fallback: Find YouTube iframe and traverse up to the video container
+    const iframe = document.querySelector('iframe[src*="youtube.com/embed"]');
+    if (iframe) {
+      // Go up to find a suitable container with position:relative
+      const container = iframe.closest('.video') ||
+                        iframe.parentElement?.closest('[style*="position: relative"]') ||
+                        iframe.parentElement?.parentElement;
+      if (container) {
+        console.log('[Flow Chat Watch] Found container via iframe parent');
+        return container;
       }
     }
 
@@ -146,6 +156,19 @@
     return null;
   }
 
+  // Send ENABLE to a chat iframe
+  function enableChatIframe(iframe) {
+    try {
+      iframe.contentWindow.postMessage(
+        { type: 'FLOW_CHAT_CONTROL', action: 'enable' },
+        'https://www.youtube.com'
+      );
+      console.log('[Flow Chat Watch] Sent ENABLE to chat iframe');
+    } catch (e) {
+      console.log('[Flow Chat Watch] Could not send ENABLE to chat iframe:', e.message);
+    }
+  }
+
   // Setup existing chat iframe (no need to create a new one)
   function setupExistingChatIframe() {
     if (backgroundChatIframe) {
@@ -161,6 +184,9 @@
     if (existingIframe) {
       console.log('[Flow Chat Watch] Using existing chat iframe');
       backgroundChatIframe = existingIframe;
+      // Proactively send ENABLE to handle race condition where
+      // FLOW_CHAT_READY was sent before we started listening
+      enableChatIframe(existingIframe);
       return existingIframe;
     } else {
       console.log('[Flow Chat Watch] No existing chat iframe found, will retry...');
@@ -229,38 +255,23 @@
   }
 
   // Check if two messages would collide
+  // Uses uniform speed model: all messages move at the same speed (px/sec),
+  // so messages never overtake each other. Only need to check if the existing
+  // message's tail has cleared the entry point (right edge of container).
   function wouldCollide(msg1, msg2, containerWidth) {
     if (msg1.top + msg1.height + settings.minVerticalGap <= msg2.top ||
         msg2.top + msg2.height + settings.minVerticalGap <= msg1.top) {
       return false;
     }
 
-    const now = Date.now();
-    const msg1Speed = (containerWidth + msg1.width) / settings.displayTime;
-    const msg2Speed = (containerWidth + msg2.width) / settings.displayTime;
+    // Uniform speed: containerWidth / displayTime (px/sec)
+    const speed = containerWidth / settings.displayTime;
+    const elapsed = (Date.now() - msg1.startTime) / 1000;
+    const msg1Right = containerWidth - speed * elapsed + msg1.width;
 
-    const msg1Left = containerWidth - msg1Speed * (now - msg1.startTime) / 1000;
-    const msg1Right = msg1Left + msg1.width;
-
-    const msg2Left = containerWidth - msg2Speed * (now - msg2.startTime) / 1000;
-    const msg2Right = msg2Left + msg2.width;
-
-    if (msg1Right > msg2Left && msg1Left < msg2Right) {
-      return true;
-    }
-
-    if (msg2Speed > msg1Speed && msg2Left > msg1Left) {
-      const relativeSpeed = msg2Speed - msg1Speed;
-      const distance = msg2Left - msg1Right;
-      const timeToCollide = (distance / relativeSpeed) * 1000;
-      const msg1ExitTime = (msg1Right / msg1Speed) * 1000;
-
-      if (timeToCollide < msg1ExitTime) {
-        return true;
-      }
-    }
-
-    return false;
+    // Collision if existing message's right edge + gap hasn't cleared the entry point
+    const horizontalGap = settings.fontSize;
+    return msg1Right + horizontalGap > containerWidth;
   }
 
   // Find available Y position for new message
@@ -291,6 +302,45 @@
     }
 
     return -1;
+  }
+
+  // requestAnimationFrame animation loop
+  // Each message's top is fixed; only translateX is updated each frame.
+  function startAnimationLoop() {
+    if (animationRunning) return;
+    animationRunning = true;
+    requestAnimationFrame(animateMessages);
+  }
+
+  function animateMessages() {
+    const now = Date.now();
+    const toRemove = [];
+
+    for (let i = 0; i < activeMessages.length; i++) {
+      const msg = activeMessages[i];
+      const elapsed = (now - msg.startTime) / 1000;
+      const currentX = msg.startX - msg.speed * elapsed;
+
+      if (currentX + msg.width < 0) {
+        // Fully off-screen left, remove
+        toRemove.push(i);
+        msg.element.remove();
+        messageCount--;
+      } else {
+        msg.element.style.transform = `translateX(${currentX}px)`;
+      }
+    }
+
+    // Remove in reverse order to keep indices valid
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+      activeMessages.splice(toRemove[i], 1);
+    }
+
+    if (activeMessages.length > 0) {
+      requestAnimationFrame(animateMessages);
+    } else {
+      animationRunning = false;
+    }
   }
 
   // Create flow message element
@@ -395,7 +445,7 @@
 
     messageEl.appendChild(messageContent);
 
-    // Temporarily add to DOM to measure width
+    // Temporarily add to DOM to measure dimensions (hidden)
     messageEl.style.visibility = 'hidden';
     messageEl.style.position = 'absolute';
     messageEl.style.left = '-9999px';
@@ -420,45 +470,40 @@
       return;
     }
 
-    const totalDistance = containerWidth + messageWidth;
-    const animationDuration = settings.displayTime;
-
-    // Track this message
+    // Track this message (speed and startX for rAF loop)
+    const speed = containerWidth / settings.displayTime; // px/sec (uniform)
     const messageInfo = {
       top: topPosition,
       height: messageHeight,
       width: messageWidth,
       startTime: Date.now(),
+      startX: containerWidth,
+      speed: speed,
       element: messageEl
     };
 
     activeMessages.push(messageInfo);
 
-    // Reset positioning for animation
+    // Lock height to prevent reflow from async image loading
+    messageEl.style.height = `${messageHeight}px`;
+    messageEl.style.overflow = 'hidden';
+
+    // Fix position: absolute top (never changes), horizontal via transform
     messageEl.style.visibility = 'visible';
     messageEl.style.position = 'absolute';
-    messageEl.style.left = '100%';
     messageEl.style.top = `${topPosition}px`;
+    messageEl.style.left = '0';
+    messageEl.style.transform = `translateX(${containerWidth}px)`;
 
-    // Set animation
-    messageEl.style.setProperty('--flow-distance', `-${totalDistance}px`);
-    messageEl.style.animationDuration = `${animationDuration}s`;
-
-    // Remove after animation
-    messageEl.addEventListener('animationend', () => {
-      messageEl.remove();
-      const idx = activeMessages.indexOf(messageInfo);
-      if (idx > -1) {
-        activeMessages.splice(idx, 1);
-      }
-      messageCount--;
-    });
+    // Start rAF loop (no-op if already running)
+    startAnimationLoop();
 
     messageCount++;
   }
 
   // Handle incoming chat messages
   function handleChatMessage(event) {
+    if (!isActive) return; // Don't process when deactivated
     if (event.origin !== 'https://www.youtube.com') return;
 
     const { type, data } = event.data;
@@ -473,7 +518,15 @@
         console.log('[Flow Chat Watch] Video ID mismatch. Expected:', videoId, 'Got:', data.videoId);
       }
     } else if (type === 'FLOW_CHAT_READY') {
-      console.log('[Flow Chat Watch] Received FLOW_CHAT_READY');
+      console.log('[Flow Chat Watch] Received FLOW_CHAT_READY from video:', data?.videoId);
+      // Send ENABLE back to the chat iframe so it starts sending messages
+      if (data && data.videoId === videoId && event.source) {
+        console.log('[Flow Chat Watch] Sending ENABLE to chat iframe for video:', videoId);
+        event.source.postMessage(
+          { type: 'FLOW_CHAT_CONTROL', action: 'enable' },
+          'https://www.youtube.com'
+        );
+      }
     }
   }
 
@@ -792,7 +845,9 @@
   function watchForChatIframe() {
     console.log('[Flow Chat Watch] Starting to watch for chat iframe changes...');
 
-    const observer = new MutationObserver((mutations) => {
+    if (chatIframeObserver) chatIframeObserver.disconnect();
+
+    chatIframeObserver = new MutationObserver((mutations) => {
       // If we already have a chat iframe, no need to check
       if (backgroundChatIframe) return;
 
@@ -821,40 +876,49 @@
       });
     });
 
-    observer.observe(document.body, {
+    chatIframeObserver.observe(document.body, {
       childList: true,
       subtree: true
     });
   }
 
 
-  // Initialize extension
-  function init() {
-    console.log('[Flow Chat Watch] Initializing...');
-    console.log('[Flow Chat Watch] Current URL:', window.location.href);
+  // Cleanup current video state (for SPA navigation)
+  function cleanup() {
+    console.log('[Flow Chat Watch] Cleaning up for video:', videoId);
 
-    loadSettings();
-    createGlobalToggleButton();
-    createControlPanel();
-
-    // Listen for messages from chat iframes
-    window.addEventListener('message', handleChatMessage);
-    console.log('[Flow Chat Watch] Message listener added');
-
-    // Listen for clicks outside control panel
-    document.addEventListener('click', handleOutsideClick);
-
-    // Watch for chat iframe changes
-    watchForChatIframe();
-
-    // Get video ID from page
-    videoId = getVideoIdFromPage();
-
-    if (!videoId) {
-      console.log('[Flow Chat Watch] No video ID found, retrying in 2s');
-      setTimeout(init, 2000);
-      return;
+    // Remove flow container
+    if (flowContainer) {
+      flowContainer.remove();
+      flowContainer = null;
     }
+
+    // Remove per-video toggle button
+    const toggleBtn = videoContainer?.querySelector('.flow-chat-video-toggle');
+    if (toggleBtn) {
+      toggleBtn.remove();
+    }
+
+    // Reset state
+    activeMessages = [];
+    messageCount = 0;
+    animationRunning = false;
+    backgroundChatIframe = null;
+    videoContainer = null;
+    flowEnabled = true;
+  }
+
+  // Reinitialize for a new video (SPA navigation)
+  function reinitializeForNewVideo(newVideoId) {
+    console.log('[Flow Chat Watch] SPA navigation detected:', videoId, '->', newVideoId);
+    cleanup();
+    videoId = newVideoId;
+    setupForCurrentVideo();
+  }
+
+  // Setup flow chat for the current video ID
+  function setupForCurrentVideo() {
+    console.log('[Flow Chat Watch] Setting up for video:', videoId);
 
     // Find video container
     videoContainer = findVideoContainer();
@@ -870,34 +934,182 @@
       createToggleButton();
       console.log('[Flow Chat Watch] Toggle button created');
 
-      // Setup existing chat iframe (single view always has a chat iframe)
-      setTimeout(() => {
-        console.log('[Flow Chat Watch] Looking for existing chat iframe after 2s delay...');
+      // Setup existing chat iframe with retries
+      const retryChatIframe = () => {
+        if (backgroundChatIframe) return;
         const iframe = setupExistingChatIframe();
-
         if (!iframe) {
-          console.log('[Flow Chat Watch] Chat iframe not found, retrying in 2s...');
-          // Retry finding chat iframe
-          setTimeout(() => {
-            const retryIframe = setupExistingChatIframe();
-            if (!retryIframe) {
-              console.log('[Flow Chat Watch] Still no chat iframe found, will retry again...');
-              // Keep retrying every 3 seconds
-              const retryInterval = setInterval(() => {
-                const finalIframe = setupExistingChatIframe();
-                if (finalIframe) {
-                  console.log('[Flow Chat Watch] Chat iframe found on retry!');
-                  clearInterval(retryInterval);
-                }
-              }, 3000);
-            }
-          }, 2000);
+          setTimeout(retryChatIframe, 3000);
         }
-      }, 2000);
+      };
+      setTimeout(retryChatIframe, 2000);
     } else {
       console.log('[Flow Chat Watch] Video container not found, retrying in 2s');
-      // Retry finding video container
-      setTimeout(init, 2000);
+      setTimeout(() => setupForCurrentVideo(), 2000);
+    }
+  }
+
+  // Clean up stale messages and force-resume animations
+  // Called when window regains focus or tab becomes visible
+  function resumeAnimations() {
+    const now = Date.now();
+    const maxAge = settings.displayTime * 1000;
+
+    const stale = [];
+    activeMessages.forEach((msg, idx) => {
+      if (now - msg.startTime > maxAge) {
+        if (msg.element && msg.element.parentNode) {
+          msg.element.remove();
+        }
+        stale.push(idx);
+      }
+    });
+    // Remove stale entries in reverse order
+    for (let i = stale.length - 1; i >= 0; i--) {
+      activeMessages.splice(stale[i], 1);
+      messageCount--;
+    }
+
+    // Restart rAF loop if there are remaining messages
+    if (activeMessages.length > 0) {
+      startAnimationLoop();
+    }
+  }
+
+  // Full cleanup when leaving watch page
+  function deactivate() {
+    if (!isActive) return;
+    isActive = false;
+    console.log('[Flow Chat Watch] Deactivating');
+
+    // Disconnect MutationObserver
+    if (chatIframeObserver) {
+      chatIframeObserver.disconnect();
+      chatIframeObserver = null;
+    }
+
+    cleanup();
+
+    // Remove global toggle and control panel
+    const toggle = document.querySelector('.flow-chat-toggle');
+    if (toggle) toggle.remove();
+    const panel = document.getElementById('flow-chat-controls');
+    if (panel) panel.remove();
+
+    controlsVisible = false;
+    videoId = null;
+  }
+
+  // Activate on watch page
+  function activate() {
+    if (isActive) return;
+    isActive = true;
+    console.log('[Flow Chat Watch] Activating');
+
+    loadSettings();
+    createGlobalToggleButton();
+    createControlPanel();
+
+    // Watch for chat iframe changes
+    watchForChatIframe();
+
+    // Get video ID and setup
+    videoId = getVideoIdFromPage();
+    if (videoId) {
+      setupForCurrentVideo();
+    } else {
+      // Retry until video ID is found
+      const retryActivate = () => {
+        if (!isActive) return;
+        videoId = getVideoIdFromPage();
+        if (videoId) {
+          setupForCurrentVideo();
+        } else {
+          setTimeout(retryActivate, 2000);
+        }
+      };
+      setTimeout(retryActivate, 2000);
+    }
+  }
+
+  // Check URL and activate/deactivate accordingly
+  let lastVideoIdSeen = null;
+  function checkPageType() {
+    if (isWatchPage() && !isActive) {
+      activate();
+      lastVideoIdSeen = videoId;
+    } else if (!isWatchPage() && isActive) {
+      deactivate();
+      lastVideoIdSeen = null;
+    }
+
+    // Video ID changed within watch page?
+    if (isActive && isWatchPage()) {
+      const currentVideoId = getVideoIdFromPage();
+      if (currentVideoId && currentVideoId !== lastVideoIdSeen) {
+        lastVideoIdSeen = currentVideoId;
+        if (videoId && videoId !== currentVideoId) {
+          reinitializeForNewVideo(currentVideoId);
+        }
+      }
+    }
+  }
+
+  // Initialize extension (one-time event listener setup + page type monitoring)
+  function init() {
+    if (initialized) return;
+    initialized = true;
+
+    console.log('[Flow Chat Watch] Initializing...');
+
+    // Listen for messages from chat iframes
+    window.addEventListener('message', handleChatMessage);
+
+    // Listen for clicks outside control panel
+    document.addEventListener('click', handleOutsideClick);
+
+    // Resume animations when window regains focus or tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        resumeAnimations();
+      }
+    });
+    window.addEventListener('focus', resumeAnimations);
+
+    // Listen for storage changes
+    loadSettings();
+
+    // Monkey-patch history.pushState/replaceState for immediate SPA navigation detection
+    // Only patch once (shared with holodex.js via global flag)
+    if (!window.__flowChatHistoryPatched) {
+      window.__flowChatHistoryPatched = true;
+      const origPushState = history.pushState;
+      const origReplaceState = history.replaceState;
+      history.pushState = function(...args) {
+        origPushState.apply(this, args);
+        window.dispatchEvent(new Event('flowchat-urlchange'));
+      };
+      history.replaceState = function(...args) {
+        origReplaceState.apply(this, args);
+        window.dispatchEvent(new Event('flowchat-urlchange'));
+      };
+      window.addEventListener('popstate', () => {
+        window.dispatchEvent(new Event('flowchat-urlchange'));
+      });
+    }
+
+    // Listen for immediate SPA navigation events
+    window.addEventListener('flowchat-urlchange', () => {
+      // Small delay to let Vue router update the DOM
+      setTimeout(checkPageType, 100);
+    });
+
+    // Fallback: poll for URL changes (catches any edge cases)
+    setInterval(checkPageType, 2000);
+
+    // Activate if currently on watch page
+    if (isWatchPage()) {
+      activate();
     }
   }
 
